@@ -1,28 +1,104 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<meta name="description" content="AI-powered cyclone monitoring and early warning dashboard">
-<title>AI CyclonePredict | Intelligence Dashboard</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="CycloneAI — AI-assisted tropical cyclone monitoring and early-warning dashboard">
+<title>CycloneAI | National Cyclone Intelligence</title>
 <link rel="stylesheet" href="style.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 </head>
 <body>
 <div class="app-shell">
 <aside class="sidebar">
-<div class="brand"><div class="brand-mark">AI</div><div><b>Cyclone<span>Predict</span></b><small>EARLY WARNING SYSTEM</small></div></div>
-<div class="nav-label">MONITORING</div>
-<nav><a class="active" href="#dashboard">⌂ <span>Dashboard</span></a><a href="#detection">◉ <span>Detection</span></a><a href="#prediction">↗ <span>Prediction</span></a><a href="#map">⌖ <span>Live Map</span></a><a href="#history">◷ <span>History</span></a></nav>
-<div class="sidebar-card"><div class="status-dot"></div><div><b>System Online</b><small>API endpoint ready</small></div></div><div class="sidebar-footer">SIH 2026 • Prototype v1.0</div>
+  <div class="brand"><div class="brand-mark">◉</div><div><b>Cyclone<span>AI</span></b><small>EARLY WARNING SYSTEM</small></div></div>
+  <div class="nav-label">MONITORING</div>
+  <nav>
+    <a class="active" href="#dashboard">⌂ <span>Command Center</span></a>
+    <a href="#satellite">◉ <span>Satellite View</span></a>
+    <a href="#forecast">↗ <span>Prediction</span></a>
+    <a href="#impact">⌖ <span>Impact Zones</span></a>
+    <a href="#pipeline">◷ <span>AI Pipeline</span></a>
+  </nav>
+  <div class="sidebar-card"><span class="online-dot"></span><div><b>System Online</b><small>Frontend operational</small></div></div>
+  <div class="sidebar-footer">SIH 2026 • Prototype v1.0</div>
 </aside>
+
 <main class="content" id="dashboard">
-<header class="topbar"><div><div class="eyebrow">NATIONAL CYCLONE INTELLIGENCE</div><h1>Command Dashboard</h1><p>AI-assisted detection, tracking and early-warning overview</p></div><div class="top-actions"><span class="last-update" id="lastUpdate">Updated just now</span><button class="refresh" id="refresh">↻ <span>Refresh</span></button></div></header>
-<div class="demo-banner"><div class="banner-icon">!</div><div><strong>Prototype / Demo Mode</strong><span>Live ML predictions will replace these values when the backend API is connected.</span></div><span class="demo-tag">MOCK DATA</span></div>
-<section class="status-strip"><div class="status-main"><span class="pulse"></span><div><small>CURRENT SYSTEM STATUS</small><strong id="status">Cyclone detected</strong></div></div><div class="strip-item"><small>CYCLONE</small><strong id="stormName">DEMO CYCLONE</strong></div><div class="strip-item"><small>CATEGORY</small><strong id="category">Cyclonic Storm</strong></div><div class="strip-item"><small>MOVEMENT</small><strong id="movement">↖ NW</strong></div><div class="strip-item"><small>CONFIDENCE</small><strong class="accent" id="confidence">92%</strong></div></section>
-<section class="metric-grid"><article class="metric-card"><div class="metric-top"><small>MAXIMUM WIND</small><span>WIND</span></div><strong id="wind">95 <i>km/h</i></strong><div class="meter"><span style="width:63%"></span></div><p>Estimated sustained wind</p></article><article class="metric-card"><div class="metric-top"><small>CENTRAL PRESSURE</small><span>PRESSURE</span></div><strong id="pressure">982 <i>hPa</i></strong><div class="meter"><span style="width:57%"></span></div><p>Lower pressure indicates intensification</p></article><article class="metric-card"><div class="metric-top"><small>LOCATION</small><span>POSITION</span></div><strong id="latitude">15.82°N</strong><strong class="location-long" id="longitude">82.15°E</strong><p>Bay of Bengal • Current estimate</p></article><article class="metric-card risk-card"><div class="metric-top"><small>RISK LEVEL</small><span>ALERT</span></div><strong>HIGH</strong><div class="risk-bar"><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i></div><p>Coastal monitoring recommended</p></article></section>
-<section class="dashboard-grid main-grid" id="map"><article class="panel map-panel"><div class="panel-head"><div><div class="eyebrow">TRACK OVERVIEW</div><h2>Predicted Cyclone Path</h2></div><div class="live-badge"><span></span> LIVE TRACK</div></div><div class="map-stage"><div class="map-grid"></div><div class="map-glow"></div><div class="landmass india-shape">INDIA</div><div class="landmass sri">SRI LANKA</div><div class="bay-label">BAY OF BENGAL</div><svg class="track-svg" viewBox="0 0 700 330" preserveAspectRatio="none"><path class="track-forecast" d="M470 255 C430 220,405 180,365 145 S305 95,270 60"/><circle class="forecast-point" cx="430" cy="218" r="6"/><circle class="forecast-point" cx="365" cy="145" r="6"/><circle class="forecast-point" cx="270" cy="60" r="6"/><circle class="current-ring" cx="470" cy="255" r="18"/><circle class="current-point" cx="470" cy="255" r="8"/></svg><div class="map-coords"><small>CURRENT POSITION</small><b>15.82°N, 82.15°E</b><span>↖ Moving NW</span></div><div class="map-time"><small>FORECAST WINDOW</small><b>24 HOURS</b></div></div><div class="map-legend"><span>● Current position</span><span>● Forecast track</span><span>• Model confidence <b>92%</b></span></div></article>
-<article class="panel risk-panel"><div class="panel-head"><div><div class="eyebrow">AI ASSESSMENT</div><h2>Risk Summary</h2></div><span class="risk-label">HIGH</span></div><div class="risk-score"><div class="score-ring"><strong>72</strong><small>/100</small></div><div><b>Elevated threat</b><p>Current intensity and forecast movement indicate increased coastal risk.</p></div></div><div class="risk-list"><div><span>Wind intensity</span><b>High</b></div><div><span>Pressure trend</span><b>Falling</b></div><div><span>Coastal impact</span><b>Moderate</b></div><div><span>Prediction confidence</span><b>92%</b></div></div><a class="primary-btn" href="#prediction">Open prediction analysis <span>→</span></a></article></section>
-<section class="dashboard-grid lower-grid" id="prediction"><article class="panel chart-panel"><div class="panel-head"><div><div class="eyebrow">INTENSITY FORECAST</div><h2>Wind & Pressure — Next 24 Hours</h2></div><div class="chart-legend"><span>Wind km/h</span><span>Pressure hPa</span></div></div><div class="chart-wrap"><canvas id="forecastChart"></canvas></div></article><article class="panel impact-panel" id="detection"><div class="panel-head"><div><div class="eyebrow">EARLY WARNING</div><h2>Coastal Impact Watch</h2></div><span class="watch-badge">WATCH</span></div><div class="coastal-list"><div><span class="district-dot"></span><div><b>Andhra Pradesh Coast</b><small>Primary monitoring zone</small></div><strong>HIGH</strong></div><div><span class="district-dot"></span><div><b>Odisha Coast</b><small>Forecast track proximity</small></div><strong>MODERATE</strong></div><div><span class="district-dot safe"></span><div><b>Tamil Nadu Coast</b><small>Outside current core</small></div><strong>LOW</strong></div></div><div class="advisory"><b>Monitoring advisory</b><span>Follow official IMD warnings for public safety decisions.</span></div></article></section>
-<section class="panel pipeline-panel" id="history"><div class="panel-head"><div><div class="eyebrow">MODEL PIPELINE</div><h2>From Satellite Data to Early Warning</h2></div><span class="pipeline-state">FRONTEND READY</span></div><div class="pipeline"><div class="step done"><span>01</span><b>Satellite Data</b><small>INSAT / environmental inputs</small></div><i>→</i><div class="step done"><span>02</span><b>Preprocessing</b><small>Cleaning & feature extraction</small></div><i>→</i><div class="step active"><span>03</span><b>Detection</b><small>Cyclone identification</small></div><i>→</i><div class="step"><span>04</span><b>Prediction</b><small>Track & intensity forecast</small></div></div></section>
-<footer><span>AI Cyclone Prediction System</span><span>Prototype dashboard • ML integration pending</span><span>Built for early-warning research</span></footer>
-</main></div><script src="script.js"></script></body></html>
+<header class="topbar">
+  <div><div class="eyebrow">NATIONAL CYCLONE INTELLIGENCE NETWORK</div><h1>Command Center</h1><p>Multi-source monitoring • AI-assisted detection • Track & intensity forecasting</p></div>
+  <div class="top-actions"><div class="system-clock"><span class="clock-dot"></span><span id="clock">--:--:-- IST</span></div><span class="last-update" id="lastUpdate">Updated just now</span><button class="refresh" id="refresh">↻ Refresh</button></div>
+</header>
+
+<div class="demo-banner"><div class="banner-icon">!</div><div><strong>PROTOTYPE / DEMO MODE</strong><span>Dashboard is ready for ML integration. Current cyclone values are illustrative mock data.</span></div><span class="demo-tag">MOCK DATA</span></div>
+
+<section class="status-strip">
+  <div class="status-main"><span class="pulse"></span><div><small>CURRENT SYSTEM STATUS</small><strong id="status">Cyclone detected</strong></div></div>
+  <div class="strip-item"><small>SYSTEM</small><strong id="stormName">DEMO CYCLONE</strong></div>
+  <div class="strip-item"><small>CATEGORY</small><strong id="category">Cyclonic Storm</strong></div>
+  <div class="strip-item"><small>MOVEMENT</small><strong id="movement">↖ NW</strong></div>
+  <div class="strip-item"><small>AI CONFIDENCE</small><strong class="accent" id="confidence">92%</strong></div>
+</section>
+
+<section class="metric-grid">
+  <article class="metric-card"><div class="metric-top"><small>MAXIMUM WIND</small><span>INTENSITY</span></div><strong id="wind">95 <i>km/h</i></strong><div class="meter"><span id="windMeter" style="width:63%"></span></div><p>Sustained wind estimate</p></article>
+  <article class="metric-card"><div class="metric-top"><small>CENTRAL PRESSURE</small><span>PRESSURE</span></div><strong id="pressure">982 <i>hPa</i></strong><div class="meter"><span id="pressureMeter" style="width:57%"></span></div><p>Pressure trend indicator</p></article>
+  <article class="metric-card"><div class="metric-top"><small>CURRENT POSITION</small><span>GIS</span></div><strong id="latitude">15.82°N</strong><strong class="location-long" id="longitude">82.15°E</strong><p>Bay of Bengal • Estimated center</p></article>
+  <article class="metric-card risk-card"><div class="metric-top"><small>THREAT LEVEL</small><span>ALERT</span></div><strong id="riskLevel">HIGH</strong><div class="risk-bar"><i></i><i></i><i class="on"></i><i class="on"></i><i class="on"></i></div><p id="riskCaption">Coastal monitoring recommended</p></article>
+</section>
+
+<section class="dashboard-grid hero-grid">
+<article class="panel map-panel" id="forecast">
+  <div class="panel-head"><div><div class="eyebrow">GIS TRACK INTELLIGENCE</div><h2>Predicted Cyclone Path</h2></div><div class="live-badge"><span></span> LIVE TRACK</div></div>
+  <div class="map-stage" id="mapStage">
+    <div class="map-grid"></div><div class="map-glow"></div>
+    <div class="landmass india">INDIA</div><div class="landmass sri">SRI LANKA</div><div class="bay-label">BAY OF BENGAL</div>
+    <svg class="track-svg" viewBox="0 0 700 330" preserveAspectRatio="none"><path class="track-forecast" d="M470 255 C430 220,405 180,365 145 S305 95,270 60"/><circle class="forecast-point" cx="430" cy="218" r="6"/><circle class="forecast-point" cx="365" cy="145" r="6"/><circle class="forecast-point" cx="270" cy="60" r="6"/><circle class="current-ring" cx="470" cy="255" r="18"/><circle class="current-point" cx="470" cy="255" r="8"/></svg>
+    <div class="map-coords"><small>CURRENT POSITION</small><b><span id="mapLat">15.82°N</span>, <span id="mapLon">82.15°E</span></b><span>↖ Moving NW</span></div>
+    <div class="map-time"><small>FORECAST WINDOW</small><b>24 HOURS</b></div>
+    <div class="map-scale">100 km</div>
+  </div>
+  <div class="map-legend"><span><b class="legend-current">●</b> Current position</span><span><b>●</b> Forecast track</span><span>• Model confidence <b>92%</b></span></div>
+</article>
+
+<article class="panel risk-panel">
+  <div class="panel-head"><div><div class="eyebrow">AI ASSESSMENT</div><h2>Risk Summary</h2></div><span class="risk-label">HIGH</span></div>
+  <div class="risk-score"><div class="score-ring"><strong>72</strong><small>/100</small></div><div><b>Elevated threat</b><p>Current intensity and projected movement indicate increased coastal exposure.</p></div></div>
+  <div class="risk-list"><div><span>Wind intensity</span><b>High</b></div><div><span>Pressure trend</span><b>Falling</b></div><div><span>Track confidence</span><b>92%</b></div><div><span>Coastal exposure</span><b>Moderate</b></div></div>
+  <div class="decision-note"><span>AI DECISION SUPPORT</span><b>Continue enhanced monitoring</b></div>
+</article>
+</section>
+
+<section class="dashboard-grid data-grid" id="satellite">
+<article class="panel satellite-panel">
+  <div class="panel-head"><div><div class="eyebrow">REMOTE SENSING</div><h2>Satellite Observation</h2></div><span class="source-badge">INSAT • IR</span></div>
+  <div class="satellite-frame"><div class="scan-lines"></div><div class="storm-cloud c1"></div><div class="storm-cloud c2"></div><div class="storm-eye"></div><div class="sat-crosshair"></div><div class="sat-label top">INFRARED / CLOUD TOP</div><div class="sat-label bottom">DEMO FRAME • DATA SOURCE PENDING</div></div>
+  <div class="sat-meta"><div><small>OBSERVATION</small><b>IR Composite</b></div><div><small>REGION</small><b>Bay of Bengal</b></div><div><small>STATUS</small><b class="accent">Ready for feed</b></div></div>
+</article>
+<article class="panel telemetry-panel">
+  <div class="panel-head"><div><div class="eyebrow">ENVIRONMENTAL SIGNALS</div><h2>Key Inputs</h2></div><span class="source-badge">MULTI-SOURCE</span></div>
+  <div class="telemetry-list">
+    <div><span class="tele-icon">🌊</span><div><b>Sea Surface Temperature</b><small>Input to intensification analysis</small></div><strong>— °C</strong></div>
+    <div><span class="tele-icon">☁</span><div><b>Cloud-top Temperature</b><small>Infrared satellite feature</small></div><strong>— °C</strong></div>
+    <div><span class="tele-icon">💨</span><div><b>Atmospheric Wind</b><small>Direction & shear features</small></div><strong>— km/h</strong></div>
+    <div><span class="tele-icon">🛰</span><div><b>Satellite Feed</b><small>Connection state</small></div><strong class="accent">READY</strong></div>
+  </div>
+</article>
+</section>
+
+<section class="dashboard-grid lower-grid" id="impact">
+<article class="panel chart-panel"><div class="panel-head"><div><div class="eyebrow">INTENSITY FORECAST</div><h2>Wind & Pressure — Next 24 Hours</h2></div><div class="chart-legend"><span>Wind km/h</span><span>Pressure hPa</span></div></div><div class="chart-wrap"><canvas id="forecastChart"></canvas></div></article>
+<article class="panel impact-panel"><div class="panel-head"><div><div class="eyebrow">EARLY WARNING</div><h2>Coastal Impact Watch</h2></div><span class="watch-badge">WATCH</span></div>
+  <div class="coastal-list"><div><span class="district-dot"></span><div><b>Andhra Pradesh Coast</b><small>Primary monitoring zone</small></div><strong>HIGH</strong></div><div><span class="district-dot"></span><div><b>Odisha Coast</b><small>Forecast track proximity</small></div><strong>MODERATE</strong></div><div><span class="district-dot safe"></span><div><b>Tamil Nadu Coast</b><small>Outside current core</small></div><strong class="safe-text">LOW</strong></div></div>
+  <div class="advisory"><b>PUBLIC SAFETY ADVISORY</b><span>Use official IMD warnings for evacuation and public-safety decisions. This prototype is decision-support software, not an official warning service.</span></div>
+</article>
+</section>
+
+<section class="panel pipeline-panel" id="pipeline"><div class="panel-head"><div><div class="eyebrow">MODEL PIPELINE</div><h2>Satellite Data → Early Warning</h2></div><span class="pipeline-state">FRONTEND READY</span></div><div class="pipeline"><div class="step done"><span>01</span><b>Satellite Data</b><small>INSAT / environmental inputs</small></div><i>→</i><div class="step done"><span>02</span><b>Preprocessing</b><small>Cleaning & feature extraction</small></div><i>→</i><div class="step active"><span>03</span><b>Detection</b><small>Cyclone identification</small></div><i>→</i><div class="step"><span>04</span><b>Prediction</b><small>Track & intensity forecast</small></div></div></section>
+
+<footer><span>CycloneAI • AI Cyclone Prediction System</span><span>Prototype dashboard • ML integration pending</span><span>For research & demonstration</span></footer>
+</main>
+</div>
+<script src="script.js"></script>
+</body>
+</html>
