@@ -1,93 +1,21 @@
 const demo={cyclone_detected:true,cyclone_name:'DEMO CYCLONE',confidence:.92,category:'Cyclonic Storm',latitude:15.82,longitude:82.15,wind_speed:95,pressure:982,movement:'NW',risk_score:72};
 const $=id=>document.getElementById(id);
-let cycloneMap,currentMarker,forecastLine,uncertaintyArea,satelliteMap;
-let satelliteLayer,labelsLayer;
+let cycloneMap,currentMarker,forecastLine,uncertaintyArea,satelliteMap,satelliteLayer,labelsLayer;
 const forecastTrack=[[15.82,82.15],[16.25,81.72],[16.82,81.25],[17.45,80.65],[18.15,79.95]];
 const forecastHours=[6,12,18,24];
-
-function riskFromData(data){
-  const wind=Number(data.wind_speed||0), pressure=Number(data.pressure||1015), confidence=Number(data.confidence||0)*100;
-  return Math.round(Math.min(98,Math.max(8,wind*.48+(1015-pressure)*.42+confidence*.18)));
-}
-function setRisk(score){
-  const level=score>=75?'EXTREME':score>=55?'HIGH':score>=35?'MODERATE':'LOW';
-  const levelEl=$('riskLevel');
-  if(levelEl){levelEl.textContent=level;levelEl.style.color=level==='LOW'?'#b8f34a':level==='MODERATE'?'#ffd477':'#ff8b7d';}
-  const scoreEl=document.querySelector('.score-ring');
-  if(scoreEl)scoreEl.style.background=`radial-gradient(circle,#0b191e 57%,transparent 59%),conic-gradient(#b8f34a ${score}%,#1c3035 0)`;
-  const number=scoreEl?.querySelector('strong');if(number)number.textContent=score;
-  const label=document.querySelector('.risk-label');if(label){label.textContent=level;label.style.color=level==='LOW'?'#b8f34a':level==='MODERATE'?'#ffd477':'#ff8b7d';}
-  const caption=$('riskCaption');if(caption)caption.textContent=level==='EXTREME'?'Immediate enhanced monitoring required':level==='HIGH'?'Coastal monitoring recommended':level==='MODERATE'?'Continue active monitoring':'Routine monitoring';
-}
-function updateDashboard(data=demo){
-  $('status').textContent=data.cyclone_detected?'Cyclone detected':'No cyclone detected';
-  $('stormName').textContent=data.cyclone_name||'UNNAMED SYSTEM';
-  $('category').textContent=data.category||'Under analysis';
-  $('movement').textContent=data.movement?`↖ ${data.movement}`:'—';
-  const confidence=Math.round((data.confidence||0)*100);
-  $('confidence').textContent=`${confidence}%`;if($('mapConfidence'))$('mapConfidence').textContent=`${confidence}%`;
-  $('wind').innerHTML=`${data.wind_speed??'—'} <i>km/h</i>`;$('pressure').innerHTML=`${data.pressure??'—'} <i>hPa</i>`;
-  const lat=Number(data.latitude||0),lon=Number(data.longitude||0);
-  $('latitude').textContent=`${lat.toFixed(2)}°N`;$('longitude').textContent=`${lon.toFixed(2)}°E`;$('mapLat').textContent=`${lat.toFixed(2)}°N`;$('mapLon').textContent=`${lon.toFixed(2)}°E`;
-  $('windMeter').style.width=`${Math.min(100,Math.max(10,Number(data.wind_speed||0)/1.5))}%`;
-  $('pressureMeter').style.width=`${Math.min(100,Math.max(10,(1015-Number(data.pressure||1015))*3+35))}%`;
-  setRisk(Number(data.risk_score)||riskFromData(data));
-  if(cycloneMap&&currentMarker){currentMarker.setLatLng([lat,lon]);cycloneMap.panTo([lat,lon],{animate:true,duration:.6});forecastTrack[0]=[lat,lon];forecastLine.setLatLngs(forecastTrack);updateMapOverlays();}
-}
-function makeCycloneIcon(){return L.divIcon({className:'cyclone-marker',html:'<span style="display:block;width:18px;height:18px;border-radius:50%;background:#b8f34a;border:3px solid #07151a;box-shadow:0 0 0 7px rgba(184,243,74,.18),0 0 22px #b8f34a;animation:mapPulse 1.8s infinite;"></span>',iconSize:[18,18],iconAnchor:[9,9]});}
-function updateMapOverlays(){
-  if(!cycloneMap)return;
-  if(uncertaintyArea)uncertaintyArea.setLatLngs(buildCorridor(forecastTrack));
-}
-function buildCorridor(points){
-  const left=[],right=[];
-  points.forEach((p,i)=>{const width=.10+i*.055;left.push([p[0]+width,p[1]-width*.9]);right.unshift([p[0]-width,p[1]+width*.9]);});
-  return left.concat(right);
-}
-function addImpactZones(){
-  const zones=[
-    {name:'Andhra Pradesh coast',lat:16.55,lon:82.15,r:125000,level:'HIGH'},
-    {name:'Odisha coast',lat:18.75,lon:84.25,r:155000,level:'MODERATE'},
-    {name:'Tamil Nadu coast',lat:13.2,lon:80.35,r:95000,level:'LOW'}
-  ];
-  zones.forEach(z=>L.circle([z.lat,z.lon],{radius:z.r,color:z.level==='HIGH'?'#ff8b7d':z.level==='MODERATE'?'#ffd477':'#b8f34a',weight:1,dashArray:'5 6',fillOpacity:.035}).bindTooltip(`${z.name} • ${z.level} watch`,{sticky:true}).addTo(cycloneMap));
-}
-function initMap(){
-  if(typeof L==='undefined'||!$('cycloneMap'))return;
-  cycloneMap=L.map('cycloneMap',{zoomControl:true,scrollWheelZoom:false,attributionControl:true}).setView([16.7,82],5);
-  const base=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:10,attribution:'© OpenStreetMap contributors'}).addTo(cycloneMap);
-  forecastLine=L.polyline(forecastTrack,{color:'#b8f34a',weight:3,dashArray:'8 8',opacity:.95}).addTo(cycloneMap);
-  L.polyline(forecastTrack,{color:'#b8f34a',weight:18,opacity:.07}).addTo(cycloneMap);
-  uncertaintyArea=L.polygon(buildCorridor(forecastTrack),{color:'#b8f34a',weight:1,dashArray:'4 5',fillColor:'#b8f34a',fillOpacity:.035}).addTo(cycloneMap).bindTooltip('Forecast uncertainty corridor',{sticky:true});
-  forecastTrack.slice(1).forEach((p,i)=>L.circleMarker(p,{radius:5,color:'#d8e5e8',weight:2,fillColor:'#61757b',fillOpacity:1}).bindTooltip(`Forecast +${forecastHours[i]}h`,{direction:'top'}).addTo(cycloneMap));
-  currentMarker=L.marker(forecastTrack[0],{icon:makeCycloneIcon()}).addTo(cycloneMap).bindPopup('<b>DEMO CYCLONE</b><br>Current estimated center<br><span style="color:#b8f34a">Prototype data</span>');
-  L.circle(forecastTrack[0],{radius:85000,color:'#b8f34a',weight:1,opacity:.5,fillColor:'#b8f34a',fillOpacity:.045}).addTo(cycloneMap).bindTooltip('Current analysis radius',{sticky:true});
-  addImpactZones();
-  L.control.layers({'Street map':base},{'Forecast corridor':uncertaintyArea},{collapsed:true}).addTo(cycloneMap);
-}
-function satelliteDate(){const d=new Date();d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10);}
-function initSatellite(){
-  const host=$('.satellite-frame');if(!host||typeof L==='undefined')return;
-  host.innerHTML='<div id="satelliteMap"></div><div class="sat-live-tag">NASA GIBS • MODIS TRUE COLOR</div><div class="sat-loading">LOADING SATELLITE TILE…</div>';
-  host.style.padding='0';
-  satelliteMap=L.map('satelliteMap',{zoomControl:false,scrollWheelZoom:false,attributionControl:false}).setView([16.7,82],5);
-  const date=satelliteDate();
-  satelliteLayer=L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,{tileSize:256,maxZoom:9,opacity:.95,crossOrigin:true});
-  satelliteLayer.on('load',()=>{$('.sat-loading')?.remove();});
-  satelliteLayer.addTo(satelliteMap);
-  labelsLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{opacity:.23,maxZoom:9,attribution:'© OpenStreetMap'}).addTo(satelliteMap);
-  L.circleMarker([15.82,82.15],{radius:7,color:'#b8f34a',weight:2,fillColor:'#b8f34a',fillOpacity:.8}).addTo(satelliteMap).bindTooltip('Estimated cyclone center');
-  L.circle([15.82,82.15],{radius:180000,color:'#b8f34a',weight:1,dashArray:'5 5',fillOpacity:0}).addTo(satelliteMap);
-  const controls=document.createElement('div');controls.className='sat-controls';controls.innerHTML='<button data-layer="true">TRUE COLOR</button><button data-layer="false">INFRARED STYLE</button>';
-  host.appendChild(controls);
-  controls.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{controls.querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const ir=btn.dataset.layer==='false';satelliteMap.getContainer().style.filter=ir?'saturate(.35) contrast(1.25) hue-rotate(125deg)':'saturate(1) contrast(1) hue-rotate(0deg)';}));
-  controls.querySelector('button')?.classList.add('active');
-}
-function buildChart(){
-  const canvas=$('forecastChart');if(!canvas||typeof Chart==='undefined')return;
-  new Chart(canvas,{type:'line',data:{labels:['NOW','+3H','+6H','+9H','+12H','+18H','+24H'],datasets:[{label:'Wind (km/h)',data:[95,97,100,102,105,108,110],borderColor:'#b8f34a',backgroundColor:'#b8f34a12',fill:true,tension:.38,yAxisID:'y',pointRadius:3,pointHoverRadius:5},{label:'Pressure (hPa)',data:[982,980,978,977,975,972,970],borderColor:'#789097',backgroundColor:'transparent',fill:false,tension:.38,yAxisID:'y1',pointRadius:3,pointHoverRadius:5}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#071318',borderColor:'#29434a',borderWidth:1,titleColor:'#fff',bodyColor:'#a6b5b9',padding:10}},scales:{x:{grid:{color:'#173038'},ticks:{color:'#60777e',font:{size:8}}},y:{position:'left',min:80,max:120,grid:{color:'#173038'},ticks:{color:'#b8f34a',font:{size:8}}},y1:{position:'right',min:960,max:990,grid:{drawOnChartArea:false},ticks:{color:'#789097',font:{size:8}}}}}});
-}
-function updateClock(){const now=new Date();$('clock').textContent=new Intl.DateTimeFormat('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now)+' IST';}
-async function refreshData(){const btn=$('refresh');if(!btn)return;btn.disabled=true;btn.textContent='↻ Updating…';try{const response=await fetch('/api/prediction',{headers:{Accept:'application/json'}});if(!response.ok)throw new Error('API unavailable');updateDashboard(await response.json());$('lastUpdate').textContent='API connected • Updated now';}catch{updateDashboard(demo);$('lastUpdate').textContent='Demo data • API not connected';}finally{btn.disabled=false;btn.textContent='↻ Refresh';}}
-$('refresh')?.addEventListener('click',refreshData);
-updateDashboard();buildChart();initMap();initSatellite();updateClock();setInterval(updateClock,1000);
+function enhancementStyles(){if(document.getElementById('phase1EnhancementStyles'))return;const s=document.createElement('style');s.id='phase1EnhancementStyles';s.textContent=`
+.satellite-frame:before{display:none!important}.satellite-frame{background:#061319!important}.satellite-frame #satelliteMap{position:absolute;inset:0;width:100%;height:100%;z-index:1}.satellite-frame #satelliteMap .leaflet-tile{filter:saturate(.9) contrast(1.08) brightness(.82)}.sat-live-tag{position:absolute;z-index:700;left:9px;top:9px;padding:5px 7px;border:1px solid #b8f34a55;border-radius:5px;background:#061318d9;color:#b8f34a;font:7px ui-monospace,monospace;letter-spacing:.8px}.sat-loading{position:absolute;z-index:700;left:50%;top:50%;transform:translate(-50%,-50%);padding:8px 10px;border:1px solid #29434a;border-radius:6px;background:#071419e8;color:#b8c8ca;font:8px ui-monospace,monospace}.sat-controls{position:absolute;z-index:700;right:8px;bottom:8px;display:flex;gap:5px}.sat-controls button{border:1px solid #29434a;background:#071419e8;color:#9cafb3;border-radius:5px;padding:5px 7px;font:7px ui-monospace,monospace;cursor:pointer}.sat-controls button.active,.sat-controls button:hover{color:#b8f34a;border-color:#b8f34a}.leaflet-control-layers{background:#071419e8!important;color:#c5d1d3;border:1px solid #29434a!important}.leaflet-control-layers-toggle{filter:invert(1) hue-rotate(80deg) brightness(.9)}.leaflet-tooltip{background:#071419!important;color:#e8f0f2!important;border:1px solid #29434a!important;box-shadow:0 5px 15px #0008;font-size:9px}.leaflet-tooltip-top:before{border-top-color:#29434a!important}.leaflet-popup-content-wrapper{box-shadow:0 8px 25px #0009!important}.map-forecast-label{font:8px ui-monospace,monospace;color:#b8f34a;background:#071419dd;border:1px solid #29434a;padding:3px 5px;border-radius:4px}.wind-cone{pointer-events:none}`;document.head.appendChild(s)}
+function riskFromData(data){const wind=Number(data.wind_speed||0),pressure=Number(data.pressure||1015),confidence=Number(data.confidence||0)*100;return Math.round(Math.min(98,Math.max(8,wind*.48+(1015-pressure)*.42+confidence*.18)))}
+function setRisk(score){const level=score>=75?'EXTREME':score>=55?'HIGH':score>=35?'MODERATE':'LOW';const levelEl=$('riskLevel');if(levelEl){levelEl.textContent=level;levelEl.style.color=level==='LOW'?'#b8f34a':level==='MODERATE'?'#ffd477':'#ff8b7d'}const scoreEl=document.querySelector('.score-ring');if(scoreEl)scoreEl.style.background=`radial-gradient(circle,#0b191e 57%,transparent 59%),conic-gradient(#b8f34a ${score}%,#1c3035 0)`;const number=scoreEl?.querySelector('strong');if(number)number.textContent=score;const label=document.querySelector('.risk-label');if(label){label.textContent=level;label.style.color=level==='LOW'?'#b8f34a':level==='MODERATE'?'#ffd477':'#ff8b7d'}const caption=$('riskCaption');if(caption)caption.textContent=level==='EXTREME'?'Immediate enhanced monitoring required':level==='HIGH'?'Coastal monitoring recommended':level==='MODERATE'?'Continue active monitoring':'Routine monitoring'}
+function updateDashboard(data=demo){$('status').textContent=data.cyclone_detected?'Cyclone detected':'No cyclone detected';$('stormName').textContent=data.cyclone_name||'UNNAMED SYSTEM';$('category').textContent=data.category||'Under analysis';$('movement').textContent=data.movement?`↖ ${data.movement}`:'—';const confidence=Math.round((data.confidence||0)*100);$('confidence').textContent=`${confidence}%`;if($('mapConfidence'))$('mapConfidence').textContent=`${confidence}%`;$('wind').innerHTML=`${data.wind_speed??'—'} <i>km/h</i>`;$('pressure').innerHTML=`${data.pressure??'—'} <i>hPa</i>`;const lat=Number(data.latitude||0),lon=Number(data.longitude||0);$('latitude').textContent=`${lat.toFixed(2)}°N`;$('longitude').textContent=`${lon.toFixed(2)}°E`;$('mapLat').textContent=`${lat.toFixed(2)}°N`;$('mapLon').textContent=`${lon.toFixed(2)}°E`;$('windMeter').style.width=`${Math.min(100,Math.max(10,Number(data.wind_speed||0)/1.5))}%`;$('pressureMeter').style.width=`${Math.min(100,Math.max(10,(1015-Number(data.pressure||1015))*3+35))}%`;setRisk(Number(data.risk_score)||riskFromData(data));if(cycloneMap&&currentMarker){currentMarker.setLatLng([lat,lon]);forecastTrack[0]=[lat,lon];forecastLine.setLatLngs(forecastTrack);updateMapOverlays()}}
+function makeCycloneIcon(){return L.divIcon({className:'cyclone-marker',html:'<span style="display:block;width:18px;height:18px;border-radius:50%;background:#b8f34a;border:3px solid #07151a;box-shadow:0 0 0 7px rgba(184,243,74,.18),0 0 22px #b8f34a;animation:mapPulse 1.8s infinite;"></span>',iconSize:[18,18],iconAnchor:[9,9]})}
+function buildCorridor(points){const left=[],right=[];points.forEach((p,i)=>{const width=.10+i*.055;left.push([p[0]+width,p[1]-width*.9]);right.unshift([p[0]-width,p[1]+width*.9])});return left.concat(right)}
+function updateMapOverlays(){if(uncertaintyArea)uncertaintyArea.setLatLngs(buildCorridor(forecastTrack))}
+function addImpactZones(){[{name:'Andhra Pradesh coast',lat:16.55,lon:82.15,r:125000,level:'HIGH'},{name:'Odisha coast',lat:18.75,lon:84.25,r:155000,level:'MODERATE'},{name:'Tamil Nadu coast',lat:13.2,lon:80.35,r:95000,level:'LOW'}].forEach(z=>L.circle([z.lat,z.lon],{radius:z.r,color:z.level==='HIGH'?'#ff8b7d':z.level==='MODERATE'?'#ffd477':'#b8f34a',weight:1,dashArray:'5 6',fillOpacity:.035}).bindTooltip(`${z.name} • ${z.level} watch`,{sticky:true}).addTo(cycloneMap))}
+function initMap(){if(typeof L==='undefined'||!$('cycloneMap'))return;enhancementStyles();cycloneMap=L.map('cycloneMap',{zoomControl:true,scrollWheelZoom:false,attributionControl:true}).setView([16.7,82],5);const base=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:10,attribution:'© OpenStreetMap contributors'}).addTo(cycloneMap);forecastLine=L.polyline(forecastTrack,{color:'#b8f34a',weight:3,dashArray:'8 8',opacity:.95}).addTo(cycloneMap);L.polyline(forecastTrack,{color:'#b8f34a',weight:18,opacity:.07}).addTo(cycloneMap);uncertaintyArea=L.polygon(buildCorridor(forecastTrack),{color:'#b8f34a',weight:1,dashArray:'4 5',fillColor:'#b8f34a',fillOpacity:.035}).addTo(cycloneMap).bindTooltip('Forecast uncertainty corridor',{sticky:true});forecastTrack.slice(1).forEach((p,i)=>L.circleMarker(p,{radius:5,color:'#d8e5e8',weight:2,fillColor:'#61757b',fillOpacity:1}).bindTooltip(`Forecast +${forecastHours[i]}h`,{direction:'top'}).addTo(cycloneMap));currentMarker=L.marker(forecastTrack[0],{icon:makeCycloneIcon()}).addTo(cycloneMap).bindPopup('<b>DEMO CYCLONE</b><br>Current estimated center<br><span style="color:#b8f34a">Prototype data</span>');L.circle(forecastTrack[0],{radius:85000,color:'#b8f34a',weight:1,opacity:.5,fillColor:'#b8f34a',fillOpacity:.045}).addTo(cycloneMap).bindTooltip('Current analysis radius',{sticky:true});addImpactZones();L.control.layers({'Street map':base},{'Forecast corridor':uncertaintyArea},{collapsed:true}).addTo(cycloneMap)}
+function satelliteDate(){const d=new Date();d.setUTCDate(d.getUTCDate()-1);return d.toISOString().slice(0,10)}
+function initSatellite(){const host=$('.satellite-frame');if(!host||typeof L==='undefined')return;enhancementStyles();host.innerHTML='<div id="satelliteMap"></div><div class="sat-live-tag">NASA GIBS • MODIS TRUE COLOR</div><div class="sat-loading">LOADING SATELLITE TILE…</div>';host.style.padding='0';satelliteMap=L.map('satelliteMap',{zoomControl:false,scrollWheelZoom:false,attributionControl:false}).setView([16.7,82],5);const date=satelliteDate();satelliteLayer=L.tileLayer(`https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/MODIS_Terra_CorrectedReflectance_TrueColor/default/${date}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg`,{tileSize:256,maxZoom:9,opacity:.95,crossOrigin:true});satelliteLayer.on('load',()=>{$('.sat-loading')?.remove()});satelliteLayer.addTo(satelliteMap);labelsLayer=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{opacity:.23,maxZoom:9,attribution:'© OpenStreetMap'}).addTo(satelliteMap);L.circleMarker([15.82,82.15],{radius:7,color:'#b8f34a',weight:2,fillColor:'#b8f34a',fillOpacity:.8}).addTo(satelliteMap).bindTooltip('Estimated cyclone center');L.circle([15.82,82.15],{radius:180000,color:'#b8f34a',weight:1,dashArray:'5 5',fillOpacity:0}).addTo(satelliteMap);const controls=document.createElement('div');controls.className='sat-controls';controls.innerHTML='<button data-layer="true">TRUE COLOR</button><button data-layer="false">IR STYLE</button>';host.appendChild(controls);controls.querySelectorAll('button').forEach(btn=>btn.addEventListener('click',()=>{controls.querySelectorAll('button').forEach(b=>b.classList.remove('active'));btn.classList.add('active');const ir=btn.dataset.layer==='false';satelliteMap.getContainer().style.filter=ir?'saturate(.35) contrast(1.25) hue-rotate(125deg)':'saturate(1) contrast(1) hue-rotate(0deg)'}));controls.querySelector('button')?.classList.add('active')}
+function buildChart(){const canvas=$('forecastChart');if(!canvas||typeof Chart==='undefined')return;new Chart(canvas,{type:'line',data:{labels:['NOW','+3H','+6H','+9H','+12H','+18H','+24H'],datasets:[{label:'Wind (km/h)',data:[95,97,100,102,105,108,110],borderColor:'#b8f34a',backgroundColor:'#b8f34a12',fill:true,tension:.38,yAxisID:'y',pointRadius:3,pointHoverRadius:5},{label:'Pressure (hPa)',data:[982,980,978,977,975,972,970],borderColor:'#789097',backgroundColor:'transparent',fill:false,tension:.38,yAxisID:'y1',pointRadius:3,pointHoverRadius:5}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#071318',borderColor:'#29434a',borderWidth:1,titleColor:'#fff',bodyColor:'#a6b5b9',padding:10}},scales:{x:{grid:{color:'#173038'},ticks:{color:'#60777e',font:{size:8}}},y:{position:'left',min:80,max:120,grid:{color:'#173038'},ticks:{color:'#b8f34a',font:{size:8}}},y1:{position:'right',min:960,max:990,grid:{drawOnChartArea:false},ticks:{color:'#789097',font:{size:8}}}}}})}
+function updateClock(){const now=new Date();$('clock').textContent=new Intl.DateTimeFormat('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now)+' IST'}
+async function refreshData(){const btn=$('refresh');if(!btn)return;btn.disabled=true;btn.textContent='↻ Updating…';try{const response=await fetch('/api/prediction',{headers:{Accept:'application/json'}});if(!response.ok)throw new Error('API unavailable');updateDashboard(await response.json());$('lastUpdate').textContent='API connected • Updated now'}catch{updateDashboard(demo);$('lastUpdate').textContent='Demo data • API not connected'}finally{btn.disabled=false;btn.textContent='↻ Refresh'}}
+$('refresh')?.addEventListener('click',refreshData);updateDashboard();buildChart();initMap();initSatellite();updateClock();setInterval(updateClock,1000);
