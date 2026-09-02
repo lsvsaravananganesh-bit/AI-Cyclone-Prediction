@@ -1,24 +1,27 @@
 const demo={cyclone_detected:true,cyclone_name:'DEMO CYCLONE',confidence:.92,category:'Cyclonic Storm',latitude:15.82,longitude:82.15,wind_speed:95,pressure:982,movement:'NW'};
 const $=id=>document.getElementById(id);
+let cycloneMap, currentMarker, forecastLine;
+const forecastTrack=[[15.82,82.15],[16.25,81.72],[16.82,81.25],[17.45,80.65],[18.15,79.95]];
 function updateDashboard(data=demo){
-  $('status').textContent=data.cyclone_detected?'Cyclone detected':'No cyclone detected';
-  $('stormName').textContent=data.cyclone_name||'UNNAMED SYSTEM';
-  $('category').textContent=data.category||'Under analysis';
-  $('movement').textContent=data.movement?`↖ ${data.movement}`:'—';
-  const confidence=Math.round((data.confidence||0)*100);
-  $('confidence').textContent=`${confidence}%`;
-  $('wind').innerHTML=`${data.wind_speed??'—'} <i>km/h</i>`;
-  $('pressure').innerHTML=`${data.pressure??'—'} <i>hPa</i>`;
-  const lat=Number(data.latitude||0).toFixed(2),lon=Number(data.longitude||0).toFixed(2);
-  $('latitude').textContent=`${lat}°N`;$('longitude').textContent=`${lon}°E`;
-  $('mapLat').textContent=`${lat}°N`;$('mapLon').textContent=`${lon}°E`;
-  $('windMeter').style.width=`${Math.min(100,Math.max(10,(data.wind_speed||0)/1.5))}%`;
-  $('pressureMeter').style.width=`${Math.min(100,Math.max(10,(1015-(data.pressure||1015))*3+35))}%`;
+ $('status').textContent=data.cyclone_detected?'Cyclone detected':'No cyclone detected';$('stormName').textContent=data.cyclone_name||'UNNAMED SYSTEM';$('category').textContent=data.category||'Under analysis';$('movement').textContent=data.movement?`↖ ${data.movement}`:'—';
+ const confidence=Math.round((data.confidence||0)*100);$('confidence').textContent=`${confidence}%`;if($('mapConfidence'))$('mapConfidence').textContent=`${confidence}%`;
+ $('wind').innerHTML=`${data.wind_speed??'—'} <i>km/h</i>`;$('pressure').innerHTML=`${data.pressure??'—'} <i>hPa</i>`;
+ const lat=Number(data.latitude||0),lon=Number(data.longitude||0);$('latitude').textContent=`${lat.toFixed(2)}°N`;$('longitude').textContent=`${lon.toFixed(2)}°E`;$('mapLat').textContent=`${lat.toFixed(2)}°N`;$('mapLon').textContent=`${lon.toFixed(2)}°E`;
+ $('windMeter').style.width=`${Math.min(100,Math.max(10,Number(data.wind_speed||0)/1.5))}%`;$('pressureMeter').style.width=`${Math.min(100,Math.max(10,(1015-Number(data.pressure||1015))*3+35))}%`;
+ if(cycloneMap){currentMarker.setLatLng([lat,lon]);cycloneMap.panTo([lat,lon],{animate:true,duration:.6});forecastTrack[0]=[lat,lon];forecastLine.setLatLngs(forecastTrack);}
 }
-function buildChart(){
- const canvas=$('forecastChart');if(!canvas||typeof Chart==='undefined')return;
- new Chart(canvas,{type:'line',data:{labels:['NOW','+3H','+6H','+9H','+12H','+18H','+24H'],datasets:[{label:'Wind (km/h)',data:[95,97,100,102,105,108,110],borderColor:'#b8f34a',backgroundColor:'#b8f34a12',fill:true,tension:.38,yAxisID:'y',pointRadius:2},{label:'Pressure (hPa)',data:[982,980,978,977,975,972,970],borderColor:'#789097',backgroundColor:'transparent',fill:false,tension:.38,yAxisID:'y1',pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#071318',borderColor:'#29434a',borderWidth:1,titleColor:'#fff',bodyColor:'#a6b5b9'}},scales:{x:{grid:{color:'#173038'},ticks:{color:'#60777e',font:{size:8}}},y:{position:'left',min:80,max:120,grid:{color:'#173038'},ticks:{color:'#b8f34a',font:{size:8}}},y1:{position:'right',min:960,max:990,grid:{drawOnChartArea:false},ticks:{color:'#789097',font:{size:8}}}}}});
+function initMap(){
+ if(typeof L==='undefined'||!$('cycloneMap'))return;
+ cycloneMap=L.map('cycloneMap',{zoomControl:true,scrollWheelZoom:false}).setView([15.82,82.15],5);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:10,attribution:'© OpenStreetMap contributors'}).addTo(cycloneMap);
+ forecastLine=L.polyline(forecastTrack,{color:'#b8f34a',weight:3,dashArray:'8 8',opacity:.95}).addTo(cycloneMap);
+ L.polyline(forecastTrack,{color:'#b8f34a',weight:14,opacity:.08}).addTo(cycloneMap);
+ forecastTrack.slice(1).forEach((p,i)=>L.circleMarker(p,{radius:5,color:'#d8e5e8',weight:2,fillColor:'#61757b',fillOpacity:1}).bindTooltip(`Forecast +${[6,12,18,24][i]}h`,{direction:'top'}).addTo(cycloneMap));
+ const icon=L.divIcon({className:'cyclone-marker',html:'<span></span>',iconSize:[26,26],iconAnchor:[13,13]});
+ currentMarker=L.marker(forecastTrack[0],{icon}).addTo(cycloneMap).bindPopup('<b>DEMO CYCLONE</b><br>Current estimated center<br><span style="color:#b8f34a">Prototype data</span>');
+ L.circle(forecastTrack[0],{radius:85000,color:'#b8f34a',weight:1,opacity:.45,fillColor:'#b8f34a',fillOpacity:.05}).addTo(cycloneMap);
 }
+function buildChart(){const canvas=$('forecastChart');if(!canvas||typeof Chart==='undefined')return;new Chart(canvas,{type:'line',data:{labels:['NOW','+3H','+6H','+9H','+12H','+18H','+24H'],datasets:[{label:'Wind (km/h)',data:[95,97,100,102,105,108,110],borderColor:'#b8f34a',backgroundColor:'#b8f34a12',fill:true,tension:.38,yAxisID:'y',pointRadius:2},{label:'Pressure (hPa)',data:[982,980,978,977,975,972,970],borderColor:'#789097',backgroundColor:'transparent',fill:false,tension:.38,yAxisID:'y1',pointRadius:2}]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#071318',borderColor:'#29434a',borderWidth:1,titleColor:'#fff',bodyColor:'#a6b5b9'}},scales:{x:{grid:{color:'#173038'},ticks:{color:'#60777e',font:{size:8}}},y:{position:'left',min:80,max:120,grid:{color:'#173038'},ticks:{color:'#b8f34a',font:{size:8}}},y1:{position:'right',min:960,max:990,grid:{drawOnChartArea:false},ticks:{color:'#789097',font:{size:8}}}}}});}
 function updateClock(){const now=new Date();$('clock').textContent=new Intl.DateTimeFormat('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}).format(now)+' IST';}
-async function refreshData(){const btn=$('refresh');btn.disabled=true;btn.textContent='↻ Updating…';try{const response=await fetch('/api/prediction',{headers:{Accept:'application/json'}});if(!response.ok)throw new Error('API unavailable');updateDashboard(await response.json());$('lastUpdate').textContent='Updated just now';}catch{updateDashboard(demo);$('lastUpdate').textContent='Demo data • API not connected';}finally{btn.disabled=false;btn.textContent='↻ Refresh';}}
-$('refresh')?.addEventListener('click',refreshData);updateDashboard();buildChart();updateClock();setInterval(updateClock,1000);
+async function refreshData(){const btn=$('refresh');btn.disabled=true;btn.textContent='↻ Updating…';try{const response=await fetch('/api/prediction',{headers:{Accept:'application/json'}});if(!response.ok)throw new Error('API unavailable');updateDashboard(await response.json());$('lastUpdate').textContent='API connected • Updated now';}catch{updateDashboard(demo);$('lastUpdate').textContent='Demo data • API not connected';}finally{btn.disabled=false;btn.textContent='↻ Refresh';}}
+$('refresh')?.addEventListener('click',refreshData);updateDashboard();buildChart();initMap();updateClock();setInterval(updateClock,1000);
