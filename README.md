@@ -1,332 +1,81 @@
-# 🌪️ AI Cyclone Prediction
+# 🌪️ AI Cyclone Prediction — SIH 2026
 
-<p align="center"><strong>AI-powered cyclone monitoring, forecasting and risk-intelligence frontend</strong><br><sub>Phase 1 • SIH-style prototype • ML/API ready</sub></p>
+**AI-assisted tropical cyclone identification, classification, intensity/track prediction, satellite intelligence, search and GIS decision support.**
 
-<p align="center"><a href="https://lsvsaravananganesh-bit.github.io/AI-Cyclone-Prediction/">🚀 Live Demo</a> • <a href="https://github.com/lsvsaravananganesh-bit/AI-Cyclone-Prediction">💻 Repository</a></p>
+🚀 Live frontend: https://lsvsaravananganesh-bit.github.io/AI-Cyclone-Prediction/
+💻 Repository: https://github.com/lsvsaravananganesh-bit/AI-Cyclone-Prediction
 
----
+## SIH problem statement
+> To develop an Artificial Intelligence (AI) / Machine Learning (ML) based system for identification, classification, and prediction of different tropical cyclone patterns using multi-source satellite data.
 
-## 1. Project Vision
-
-AI Cyclone Prediction is being developed as an intelligent cyclone command center that brings together satellite observations, environmental inputs, machine-learning predictions, GIS visualization, risk assessment and decision support in one interface.
-
-The development strategy is intentionally split into phases:
+## What the updated system contains
 
 ```text
-PHASE 1                         PHASE 2                    PHASE 3
-Frontend foundation      →      ML + Backend           →    Real integration
-      │                              │                         │
-      ├─ Dashboard                   ├─ Detection              ├─ Live data
-      ├─ Map                         ├─ Classification         ├─ Real predictions
-      ├─ Satellite UI                ├─ Track prediction       ├─ Validation
-      ├─ Charts                      ├─ Intensity model        └─ Deployment
-      ├─ Risk UI                     └─ REST API
-      └─ API contract
+INSAT / satellite imagery       Environmental data       Historical cyclone records
+          │                            │                          │
+          └─────────────── Preprocessing & quality checks ───────┘
+                                      │
+                              AI / ML ENGINE
+             ┌────────────────┬───────┼───────────────┐
+             ↓                ↓       ↓               ↓
+          Detection      Pattern   Intensity       Track
+          / location   classification estimation   prediction
+             └────────────────┬───────┴───────────────┘
+                              ↓
+                  Confidence + uncertainty + XAI
+                              ↓
+                   FastAPI + PostgreSQL API
+                              ↓
+             SIH Command Center / GIS / Search
 ```
 
-> ⚠️ **Prototype status:** Phase 1 uses clearly labelled illustrative/demo values. It is not an official cyclone warning service and must not be used for emergency decisions.
+### Frontend
+- SIH command-centre dashboard
+- Live cyclone tracker with observed vs forecast separation
+- Official IMD/RSMC satellite products: IR, Visible, Water Vapour, Cloud-Top BT
+- Satellite image upload console
+- CSV/JSON environmental-data validation
+- Cyclone search/history console
+- Responsive presentation flow for judges
+- Explicit OFFICIAL / AI / DEMO / MODEL NOT TRAINED states
 
----
+### Backend
+`backend/main.py` provides:
+- `GET /api/health`
+- `GET /api/cyclones/search?q=` — PostgreSQL search hook
+- `GET /api/cyclones/active`
+- `POST /api/ml/analyze-image` — image validation + trained-model integration point
+- `POST /api/data/validate` — CSV/JSON validation
 
-## 2. Phase 1 Frontend Architecture
+`backend/schema.sql` provides PostgreSQL tables for cyclone records, track points and ML analyses, with trigram search indexes.
 
-The frontend is deliberately kept in three main files so the six-member team can work without mixing UI and ML responsibilities.
+### ML baseline
+`ml/train_image_classifier.py` is a real trainable ResNet18 transfer-learning baseline. Dataset format:
 
 ```text
-AI-Cyclone-Prediction/
-├── index.html      # Complete dashboard structure
-├── style.css       # Complete responsive command-center design
-├── script.js       # Frontend behavior, map, charts and API adapters
-└── README.md       # Project and team documentation
+ml/datasets/classification/
+├── cyclonic_storm/
+├── severe_cyclonic_storm/
+├── very_severe_cyclonic_storm/
+└── ...
 ```
 
-### `index.html`
-Contains the complete user interface:
+Train with:
 
-- Command Center header and navigation
-- System/prototype status
-- Cyclone overview metrics
-- Interactive GIS map
-- AI predicted track and uncertainty corridor
-- IMD observed/forecast/cone/wind-warning layer containers
-- Satellite visualization
-- Environmental input cards
-- Wind and pressure chart
-- Cyclone risk visualization
-- Forecast timeline/table
-- AI assessment and advisory UI
-- Coastal impact watch
-- AI vs IMD validation panel
-- End-to-end AI pipeline
-- Responsive/mobile layout structure
-
-### `style.css`
-Contains the complete visual system:
-
-- Dark SIH-style command-center theme
-- Black/blue/lime dashboard palette
-- Cards, panels and status badges
-- Map overlays
-- Risk gauge
-- Charts/table styling
-- Satellite presentation
-- Pipeline visualization
-- Responsive breakpoints for tablets and phones
-
-### `script.js`
-Contains frontend logic only:
-
-- Demo data adapter
-- `/api/prediction` integration point
-- Leaflet map
-- AI track rendering
-- Uncertainty corridor
-- IMD API adapters
-- IMD track/cone/wind-warning layers
-- NASA GIBS satellite tile
-- Chart.js forecast chart
-- Forecast table rendering
-- Risk visualization
-- AI vs IMD geographic comparison
-- IST clock
-- Refresh handling
-- API fallback/error states
-
----
-
-## 3. Complete Phase 1 Feature Set
-
-### 🖥️ Command Center
-Central dashboard for cyclone monitoring.
-
-### 🗺️ Interactive GIS Map
-Separate visualization layers for:
-
-```text
-Base Map
-├── Current cyclone position
-├── AI predicted track
-├── AI uncertainty corridor
-├── IMD observed track
-├── IMD forecast track
-├── IMD cone of uncertainty
-├── IMD wind-warning geometry
-└── Coastal watch zones
+```bash
+pip install -r backend/requirements.txt
+python ml/train_image_classifier.py --data ml/datasets/classification --epochs 10
 ```
 
-### 🛰️ Satellite Visualization
-Public NASA GIBS/MODIS imagery is used as a Phase 1 visual data layer. INSAT-specific integration remains a future data-pipeline task.
+The project must not publish fabricated accuracy, confidence or forecast values. Add held-out storm/time-period evaluation before presenting metrics.
 
-### 🌡️ Environmental Intelligence
-The UI is prepared for model inputs such as:
+## Live data principle
+The browser dashboard attempts to read the official IMD public cyclone-track endpoint. Production deployment should use a server-side proxy/cache when browser CORS or rate limits prevent direct access. When no verified live cyclone is available, the dashboard shows **NO ACTIVE SYSTEM** rather than inventing a track.
 
-- Sea-surface temperature
-- Cloud-top temperature
-- Humidity
-- Vertical wind shear
-- Atmospheric instability
-- Tropical heat potential
+## SIH differentiator
+Existing systems such as IMD already provide operational monitoring and warnings. This project is positioned as an **AI-assisted intelligence layer** that brings together multi-source satellite pattern analysis, environmental feature fusion, historical search, model confidence, uncertainty-aware GIS and explainable research outputs in one workflow.
 
-Current Phase 1 values are demo inputs.
+**OBSERVE → ANALYSE → PREDICT → VISUALIZE → DECIDE**
 
-### 📈 Intensity Forecast
-Wind speed and central pressure are visualized through Chart.js and can later consume model output.
-
-### ⚠️ Risk Intelligence
-Threat score, risk factors and coastal exposure are presented as a visualization layer. The production risk engine will be connected later.
-
-### 🔮 Forecast Timeline
-The table is designed around time, latitude, longitude, wind, pressure, category and confidence.
-
-### 🌊 Coastal Impact Watch
-Provides a structured UI for location-specific wind, rainfall, storm-surge and risk information.
-
-### 🧠 AI Assessment
-Prepared for an explainable summary of model output. It does not claim real AI predictions while the ML service is disconnected.
-
-### 🔬 AI vs IMD Validation
-The frontend calculates geographic track differences when both AI and IMD forecast tracks are available:
-
-- Mean track error
-- Endpoint error
-- Track agreement indicator
-- Validation status
-
-This is a comparison aid, **not an AI accuracy claim**.
-
----
-
-## 4. Final System Architecture
-
-```text
-                 DATA SOURCES
-                      │
-       ┌──────────────┼───────────────┐
-       ↓              ↓               ↓
-   Satellite      Environment     Historical Data
-       │              │               │
-       └──────────────┼───────────────┘
-                      ↓
-              DATA PREPROCESSING
-                      ↓
-               FEATURE EXTRACTION
-                      ↓
-              ┌───────────────┐
-              │    ML LAYER   │
-              ├───────────────┤
-              │ Detection     │
-              │ Classification│
-              │ Track forecast│
-              │ Intensity     │
-              └───────┬───────┘
-                      ↓
-                 BACKEND API
-                      ↓
-              `/api/prediction`
-                      ↓
-              FRONTEND ADAPTER
-                      ↓
-        ┌─────────────┼─────────────┐
-        ↓             ↓             ↓
-       MAP          CHARTS        RISK UI
-        │             │             │
-        └─────────────┼─────────────┘
-                      ↓
-              DECISION SUPPORT
-```
-
----
-
-## 5. Frontend → ML API Contract
-
-The frontend is prepared to consume a response similar to:
-
-```json
-{
-  "cyclone_detected": true,
-  "cyclone_name": "Cyclone XYZ",
-  "confidence": 0.94,
-  "category": "Severe Cyclonic Storm",
-  "latitude": 15.82,
-  "longitude": 82.15,
-  "wind_speed": 120,
-  "pressure": 970,
-  "movement": "NW",
-  "forecast": [
-    {
-      "latitude": 16.20,
-      "longitude": 81.70,
-      "time": "2026-09-03T06:00:00"
-    },
-    {
-      "latitude": 16.80,
-      "longitude": 81.20,
-      "time": "2026-09-03T12:00:00"
-    }
-  ]
-}
-```
-
-The important design goal is:
-
-```text
-DEMO JSON  →  same UI  →  REAL ML JSON
-```
-
-The frontend should not need a redesign when the model becomes available.
-
----
-
-## 6. IMD Integration
-
-The frontend contains adapters for the official IMD API structure:
-
-```text
-Cyclone Track       → observed + forecast track
-Cyclone Wind        → wind-warning geometry
-Cyclone COU         → cone of uncertainty
-```
-
-Browser access can be restricted by authentication or CORS. When that happens, the dashboard explicitly reports IMD as unavailable instead of pretending demo data is official.
-
----
-
-## 7. Six-Member Development Split
-
-| Member | Primary responsibility |
-|---|---|
-| 1 — Frontend Lead | Command Center, HTML/CSS/JS integration |
-| 2 — GIS/Data Viz | Map layers, satellite and visualization support |
-| 3 — Data Engineer | Datasets, cleaning and preprocessing |
-| 4 — ML Detection | Cyclone detection and intensity classification |
-| 5 — Forecast ML | Track and intensity forecasting |
-| 6 — Backend/Integration | REST API, ML serving and frontend integration |
-
-The frontend can progress independently while Members 3–6 develop the ML/backend stack.
-
----
-
-## 8. Phase 1 Completion Checklist
-
-### Frontend foundation
-- [x] Command-center layout
-- [x] Navigation and sections
-- [x] Responsive design
-- [x] Prototype/live status separation
-
-### Visualization
-- [x] Interactive map
-- [x] AI track
-- [x] Uncertainty corridor
-- [x] IMD layer containers
-- [x] Satellite panel
-- [x] Wind/pressure chart
-- [x] Forecast table
-- [x] Risk gauge
-- [x] Coastal impact table
-- [x] AI vs IMD comparison UI
-- [x] Pipeline visualization
-
-### Integration readiness
-- [x] `/api/prediction` adapter
-- [x] Demo fallback
-- [x] Loading/refresh state
-- [x] Error handling
-- [x] Clear mock-data labelling
-- [ ] Real ML service
-- [ ] Production backend
-- [ ] Validated real-time data pipeline
-
----
-
-## 9. Development Rule
-
-**Do not mix ML training code into the frontend files.**
-
-Frontend:
-
-```text
-index.html + style.css + script.js
-```
-
-ML/backend:
-
-```text
-dataset → preprocessing → model → API
-```
-
-Integration:
-
-```text
-API JSON → script.js → map/charts/cards/alerts
-```
-
-This separation allows the six members to work simultaneously with minimal conflicts.
-
----
-
-## ⚠️ Disclaimer
-
-This is an evolving research/prototype system. Demo values are illustrative and are not real-time meteorological observations. The platform is not an official warning authority. For operational cyclone forecasts, warnings, evacuation instructions and emergency decisions, follow the relevant official meteorological and disaster-management authorities.
-
-<p align="center"><strong>🌪️ Observe → Detect → Predict → Assess Risk → Visualize → Support Decisions</strong></p>
+## Safety / scope
+This is a research and decision-support prototype. It does not replace IMD/RSMC, does not issue official warnings, and must not be used as an emergency source. AI predictions require validation against authoritative observations before operational use.
