@@ -1,4 +1,4 @@
-/* Frontend bridge: keeps GitHub Pages simple while routing live IMD calls through FastAPI when configured. */
+/* Frontend bridge: routes live IMD calls through FastAPI when configured and exposes the existing Leaflet map to optional SIH layers. */
 (() => {
   const api = (window.CYCLONE_API_BASE || '').replace(/\/$/, '');
   const originalFetch = window.fetch.bind(window);
@@ -18,12 +18,29 @@
       return originalFetch(input, init);
     };
   }
-  const wait = setInterval(() => {
-    const el = document.getElementById('cycloneMap');
-    if (el && window.L && el._leaflet_id) {
-      // Leaflet stores the map instance internally only through event state; this bridge
-      // creates a public reference when the dashboard exposes one in future versions.
-      clearInterval(wait);
-    }
-  }, 250);
+  function installMapCapture(){
+    if (!window.L || window.__cycloneMapCaptureInstalled) return;
+    window.__cycloneMapCaptureInstalled = true;
+    const originalMap = window.L.map;
+    window.L.map = function(){
+      const instance = originalMap.apply(this, arguments);
+      window.cycloneMapInstance = instance;
+      window.dispatchEvent(new CustomEvent('cyclone-map-ready', {detail: instance}));
+      return instance;
+    };
+  }
+  function loadAILayer(){
+    if (window.__aiMapLayerLoaded) return;
+    window.__aiMapLayerLoaded = true;
+    const s = document.createElement('script');
+    s.src = 'ai-map-layer.js';
+    s.defer = true;
+    document.head.appendChild(s);
+  }
+  const boot = () => {
+    installMapCapture();
+    if (window.cycloneMapInstance) loadAILayer();
+  };
+  if (window.L) boot(); else window.addEventListener('load', boot, {once:true});
+  window.addEventListener('cyclone-map-ready', loadAILayer);
 })();
