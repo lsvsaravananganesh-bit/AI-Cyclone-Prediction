@@ -75,4 +75,5 @@
   new MutationObserver(bindMainDashboardUpload).observe(document.body,{childList:true,subtree:true});
   renderHistory();
   window.SIHUpgrade={open:()=>drawer.classList.add('open'),search};
+  const proto=document.createElement('script');proto.defer=true;proto.src='prototype-upgrade.js';document.head.appendChild(proto);
 })();
