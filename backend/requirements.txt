@@ -9,5 +9,5 @@ numpy>=1.26
 scikit-learn>=1.5
 joblib>=1.4
 opencv-python-headless>=4.10
-torch>=2.4
-torchvision>=0.19
+tensorflow>=2.16
+h5py>=3.11
