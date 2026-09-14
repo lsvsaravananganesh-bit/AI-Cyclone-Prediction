@@ -1,6 +1,7 @@
 /* SIH 2026 product layer: search + upload + data + history. Honest fallbacks only. */
 (() => {
-  const API=(window.CYCLONE_API_BASE||'').replace(/\/$/,'');
+  const API=(window.CYCLONE_API_BASE||'https://ai-cyclone-prediction-api.onrender.com').replace(/\/$/,'');
+  window.CYCLONE_API_BASE=API;
   const q=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const css=document.createElement('link');css.rel='stylesheet';css.href='sih-upgrade.css';document.head.appendChild(css);
   const fab=document.createElement('button');fab.className='sih-fab';fab.textContent='⚡ SIH AI Console';document.body.appendChild(fab);
@@ -12,8 +13,66 @@
   q('#sihSearchBtn').onclick=search;q('#sihSearch').onkeydown=e=>{if(e.key==='Enter')search()};renderResults(local);
   function saveHistory(entry){const a=JSON.parse(localStorage.getItem('sihCycloneAnalyses')||'[]');a.unshift(entry);localStorage.setItem('sihCycloneAnalyses',JSON.stringify(a.slice(0,12)));renderHistory()}
   function renderHistory(){const a=JSON.parse(localStorage.getItem('sihCycloneAnalyses')||'[]');q('#sihHistory').innerHTML=a.length?`<table class="sih-history"><thead><tr><th>TIME</th><th>FILE</th><th>RESULT</th><th>STATUS</th></tr></thead><tbody>${a.map(x=>`<tr><td>${esc(x.time)}</td><td>${esc(x.file)}</td><td>${esc(x.result)}</td><td><span class="sih-badge ${x.demo?'demo':''}">${x.status}</span></td></tr>`).join('')}</tbody></table>`:'<div class="sih-status">No browser-saved analyses yet.</div>'}
-  q('#sihImage').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;const preview=q('#sihPreview');preview.src=URL.createObjectURL(file);preview.style.display='block';q('#sihImageStatus').textContent='Uploading image to ML service…';q('#sihModel').textContent='RUNNING';try{const fd=new FormData();fd.append('file',file);const r=await fetch(`${API}/api/ml/analyze-image`,{method:'POST',body:fd});if(!r.ok)throw 0;const d=await r.json();q('#sihModel').textContent=d.model_status||'MODEL';q('#sihClass').textContent=d.classification||'—';q('#sihConf').textContent=d.confidence!=null?`${d.confidence}%`:'—';q('#sihImageStatus').textContent=d.message||'Analysis complete';saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:d.classification||'Analysis',status:d.model_status||'MODEL OUTPUT',demo:Boolean(d.demo)})}catch{q('#sihModel').textContent='NOT CONNECTED';q('#sihClass').textContent='—';q('#sihConf').textContent='—';q('#sihImageStatus').textContent='Backend ML endpoint is not connected. No fake prediction was generated.';saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:'Not analysed',status:'BACKEND REQUIRED',demo:false})}};
+  async function analyseFile(file, previewEl, statusEl, modelEl, classEl, confEl){
+    if(!file)return;
+    if(previewEl){previewEl.src=URL.createObjectURL(file);previewEl.style.display='block'}
+    if(statusEl)statusEl.textContent='Connecting to Render AI service…';
+    if(modelEl)modelEl.textContent='RUNNING';
+    const fd=new FormData();fd.append('file',file);
+    try{
+      const r=await fetch(`${API}/api/ml/analyze-image`,{method:'POST',body:fd,cache:'no-store'});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(d.detail||`HTTP ${r.status}`);
+      if(modelEl)modelEl.textContent=d.model_status||'AI MODEL';
+      if(classEl)classEl.textContent=d.classification||'—';
+      if(confEl)confEl.textContent=d.confidence!=null?`${d.confidence}%`:'—';
+      if(statusEl)statusEl.textContent=d.message||'Real AI analysis complete.';
+      window.dispatchEvent(new CustomEvent('ai-model-result',{detail:d}));
+      saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:d.classification||'Analysis',status:d.model_status||'MODEL OUTPUT',demo:Boolean(d.demo)});
+      return d;
+    }catch(e){
+      if(modelEl)modelEl.textContent='AI ERROR';
+      if(classEl)classEl.textContent='—';
+      if(confEl)confEl.textContent='—';
+      if(statusEl)statusEl.textContent=`ML backend error: ${e.message}`;
+      saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:'Not analysed',status:'ML ERROR',demo:false});
+    }
+  }
+  q('#sihImage').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;await analyseFile(file,q('#sihPreview'),q('#sihImageStatus'),q('#sihModel'),q('#sihClass'),q('#sihConf'));};
   q('#sihDataBtn').onclick=async()=>{const file=q('#sihData').files?.[0];if(!file){q('#sihDataStatus').textContent='Choose a CSV or JSON file first.';return}const text=await file.text();let ok=false,count=0;try{if(file.name.toLowerCase().endsWith('.json')){const d=JSON.parse(text);count=Array.isArray(d)?d.length:(Array.isArray(d.data)?d.data.length:1);ok=true}else{const lines=text.split(/\r?\n/).filter(Boolean);const headers=(lines[0]||'').toLowerCase().split(',').map(x=>x.trim());const required=['timestamp','latitude','longitude'];ok=required.every(x=>headers.includes(x));count=Math.max(0,lines.length-1)}q('#sihDataStatus').textContent=ok?`✓ Validated ${count} record(s). Ready for API/training pipeline.`:'⚠ Missing required fields. Need timestamp, latitude and longitude.'}catch{q('#sihDataStatus').textContent='⚠ Invalid CSV/JSON format.'}};
+
+  // Main dashboard upload (#imageInput) was previously missing a handler.
+  // It now uses the same real Render ML endpoint as the AI Console.
+  function bindMainDashboardUpload(){
+    const input=q('#imageInput');
+    if(!input||input.__mainUploadBound)return;
+    input.__mainUploadBound=true;
+    input.addEventListener('change',async()=>{
+      const file=input.files?.[0];if(!file)return;
+      q('#fileName').textContent=file.name;
+      q('#uploadClass').textContent='Analysing…';
+      q('#uploadPattern').textContent='RUNNING';
+      q('#uploadWind').textContent='—';
+      q('#uploadPressure').textContent='—';
+      q('#uploadConfidence').textContent='—';
+      q('#uploadRisk').textContent='—';
+      const result=await analyseFile(file,null,null,null,null,null);
+      if(!result){q('#uploadClass').textContent='AI ERROR';q('#uploadPattern').textContent='Backend unavailable';return}
+      const detected=Boolean(result.stage1?.detected);
+      q('#uploadClass').textContent=result.classification||(detected?'CYCLONE DETECTED':'NO CYCLONE DETECTED');
+      q('#uploadPattern').textContent=detected?(result.classification||'Cyclonic pattern'):'No cyclone detected';
+      q('#uploadWind').textContent=result.stage3?.wind_change_kt!=null?`${Number(result.stage3.wind_change_kt).toFixed(2)} kt Δ`:'Not estimated';
+      q('#uploadPressure').textContent=result.stage3?.mslp_change_hpa!=null?`${Number(result.stage3.mslp_change_hpa).toFixed(2)} hPa Δ`:'Not estimated';
+      q('#uploadConfidence').textContent=result.confidence!=null?`${Number(result.confidence).toFixed(2)}%`:'—';
+      q('#uploadRisk').textContent=detected?`${Number(result.stage1?.probability||0).toFixed(2)}% detection`:'No cyclone';
+      q('#modelForecastStatus').textContent=result.model_status==='MODEL_OUTPUT'?'Real 3-stage Keras model output received':(result.model_status||'Backend response received');
+      q('#analysisClass').textContent=result.classification||'Waiting';
+      q('#snapshotPattern').textContent=result.classification||'—';
+      q('#snapshotConfidence').textContent=result.confidence!=null?`${result.confidence}%`:'—';
+    });
+  }
+  bindMainDashboardUpload();
+  new MutationObserver(bindMainDashboardUpload).observe(document.body,{childList:true,subtree:true});
   renderHistory();
   window.SIHUpgrade={open:()=>drawer.classList.add('open'),search};
 })();
