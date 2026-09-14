@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ai-cyclone-prediction-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    envVars:
+      - key: PORT
+        value: 8000
+      - key: ML_MODEL_DIR
+        value: /app/backend/models
+      - key: IMD_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
