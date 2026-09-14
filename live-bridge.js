@@ -39,17 +39,8 @@
     s.defer = true;
     document.head.appendChild(s);
   }
-  function loadMainUpload(){
-    if (window.__mainUploadLoaded) return;
-    window.__mainUploadLoaded = true;
-    const s = document.createElement('script');
-    s.src = 'main-upload.js';
-    s.defer = true;
-    document.head.appendChild(s);
-  }
   const boot = () => {
     installMapCapture();
-    loadMainUpload();
     if (window.cycloneMapInstance) loadAILayer();
   };
   if (window.L) boot(); else window.addEventListener('load', boot, {once:true});
