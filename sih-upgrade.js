@@ -5,26 +5,20 @@
   const q=s=>document.querySelector(s), esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
   const css=document.createElement('link');css.rel='stylesheet';css.href='sih-upgrade.css';document.head.appendChild(css);
 
-  // Frontend-only identification card. It consumes the existing Stage-1 result
-  // returned by Render and does not change the ML backend/API contract.
   function ensureIdentificationCard(){
     if(document.getElementById('sihIdentificationCard'))return;
     const anchor=q('#uploadClass')?.closest('.card, .panel, .glass, section')||q('#uploadClass')?.parentElement?.parentElement;
-    const card=document.createElement('div');
-    card.id='sihIdentificationCard';
+    const card=document.createElement('div');card.id='sihIdentificationCard';
     card.style.cssText='margin:16px 0;padding:20px 22px;border:1px solid rgba(255,255,255,.14);border-radius:18px;background:rgba(10,15,22,.82);box-shadow:0 12px 35px rgba(0,0,0,.22);display:flex;align-items:center;justify-content:space-between;gap:18px;';
-    card.innerHTML='<div><div style="font-size:11px;letter-spacing:2px;opacity:.65;font-weight:700">STAGE 1 • IDENTIFICATION</div><div style="font-size:20px;font-weight:800;margin-top:5px">Cyclone Detection</div><div id="sihIdentificationHint" style="font-size:12px;opacity:.68;margin-top:5px">Upload a satellite image to determine whether a cyclone is present.</div></div><div id="sihIdentificationResult" style="font-size:24px;font-weight:900;min-width:180px;text-align:right">WAITING</div>';
+    card.innerHTML='<div><div style="font-size:11px;letter-spacing:2px;opacity:.65;font-weight:700">STAGE 1 • IDENTIFICATION</div><div style="font-size:20px;font-weight:800;margin-top:5px">Cyclone Detection Gate</div><div id="sihIdentificationHint" style="font-size:12px;opacity:.68;margin-top:5px">Only a detected cyclone image can proceed to classification and prediction.</div></div><div id="sihIdentificationResult" style="font-size:24px;font-weight:900;min-width:220px;text-align:right">WAITING</div>';
     if(anchor&&anchor.parentElement)anchor.parentElement.insertBefore(card,anchor);else document.body.appendChild(card);
   }
   function updateIdentification(d){
-    ensureIdentificationCard();
-    const result=q('#sihIdentificationResult'),hint=q('#sihIdentificationHint');
-    if(!result)return;
+    ensureIdentificationCard();const result=q('#sihIdentificationResult'),hint=q('#sihIdentificationHint');if(!result)return;
     if(!d){result.textContent='WAITING';return;}
-    if(d.model_status==='MODEL_NOT_READY'){result.textContent='MODEL NOT READY';if(hint)hint.textContent='Render is reachable, but the required model artifacts are not ready.';return;}
-    const detected=Boolean(d.stage1?.detected);
-    result.textContent=detected?'YES — CYCLONE DETECTED':'NO — NO CYCLONE';
-    if(hint)hint.textContent=`Detection probability: ${d.stage1?.probability!=null?Number(d.stage1.probability).toFixed(2)+'%':'—'} • Stage 1 binary identification`;
+    if(d.model_status==='MODEL_NOT_READY'){result.textContent='MODEL NOT READY';if(hint)hint.textContent='Required model artifacts are not ready.';return;}
+    const detected=Boolean(d.stage1?.detected);result.textContent=detected?'YES — CYCLONE DETECTED':'INVALID IMAGE';
+    if(hint)hint.textContent=detected?`Detection probability: ${d.stage1?.probability!=null?Number(d.stage1.probability).toFixed(2)+'%':'—'} • Continuing to Stage 2/3`:'No cyclone detected. Classification, intensity and track prediction have been blocked.';
   }
   ensureIdentificationCard();
 
@@ -40,67 +34,35 @@
   async function analyseFile(file, previewEl, statusEl, modelEl, classEl, confEl){
     if(!file)return;
     if(previewEl){previewEl.src=URL.createObjectURL(file);previewEl.style.display='block'}
-    if(statusEl)statusEl.textContent='Connecting to Render AI service…';
-    if(modelEl)modelEl.textContent='RUNNING';
+    if(statusEl)statusEl.textContent='Connecting to Render AI service…';if(modelEl)modelEl.textContent='RUNNING';
     const fd=new FormData();fd.append('file',file);
     try{
-      const r=await fetch(`${API}/api/ml/analyze-image`,{method:'POST',body:fd,cache:'no-store'});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok)throw new Error(d.detail||`HTTP ${r.status}`);
-      updateIdentification(d);
-      const detected=Boolean(d.stage1?.detected);
-      const detectionText=detected?'YES — CYCLONE DETECTED':'NO — NO CYCLONE';
-      if(q('#sihDetection'))q('#sihDetection').textContent=detectionText;
-      if(modelEl)modelEl.textContent=d.model_status||'AI MODEL';
-      if(classEl)classEl.textContent=d.classification||'—';
-      if(confEl)confEl.textContent=d.confidence!=null?`${d.confidence}%`:'—';
-      if(statusEl)statusEl.textContent=d.message||'Real AI analysis complete.';
-      window.dispatchEvent(new CustomEvent('ai-model-result',{detail:d}));
-      saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:detectionText,status:d.model_status||'MODEL OUTPUT',demo:Boolean(d.demo)});
-      return d;
-    }catch(e){
-      updateIdentification(null);
-      if(q('#sihDetection'))q('#sihDetection').textContent='ERROR';
-      if(modelEl)modelEl.textContent='AI ERROR';
-      if(classEl)classEl.textContent='—';
-      if(confEl)confEl.textContent='—';
-      if(statusEl)statusEl.textContent=`ML backend error: ${e.message}`;
-      saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:'Not analysed',status:'ML ERROR',demo:false});
-    }
+      const r=await fetch(`${API}/api/ml/analyze-image`,{method:'POST',body:fd,cache:'no-store'});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||`HTTP ${r.status}`);
+      updateIdentification(d);const detected=Boolean(d.stage1?.detected);const detectionText=detected?'YES — CYCLONE DETECTED':'INVALID IMAGE';
+      if(q('#sihDetection'))q('#sihDetection').textContent=detectionText;if(modelEl)modelEl.textContent=d.model_status||'AI MODEL';
+      if(!detected){
+        if(classEl)classEl.textContent='INVALID IMAGE';if(confEl)confEl.textContent='—';if(statusEl)statusEl.textContent='⚠ Invalid image: no cyclone detected. No classification or prediction generated.';
+        saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:'INVALID IMAGE — NO CYCLONE',status:'REJECTED',demo:false});
+        window.dispatchEvent(new CustomEvent('ai-model-result',{detail:{...d,valid_cyclone_image:false,blocked:true}}));return d;
+      }
+      if(classEl)classEl.textContent=d.classification||'—';if(confEl)confEl.textContent=d.confidence!=null?`${d.confidence}%`:'—';if(statusEl)statusEl.textContent=d.message||'Real AI analysis complete.';
+      window.dispatchEvent(new CustomEvent('ai-model-result',{detail:d}));saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:detectionText,status:d.model_status||'MODEL OUTPUT',demo:Boolean(d.demo)});return d;
+    }catch(e){updateIdentification(null);if(q('#sihDetection'))q('#sihDetection').textContent='ERROR';if(modelEl)modelEl.textContent='AI ERROR';if(classEl)classEl.textContent='—';if(confEl)confEl.textContent='—';if(statusEl)statusEl.textContent=`ML backend error: ${e.message}`;saveHistory({time:new Date().toLocaleString('en-IN'),file:file.name,result:'Not analysed',status:'ML ERROR',demo:false});}
   }
   q('#sihImage').onchange=async e=>{const file=e.target.files?.[0];if(!file)return;await analyseFile(file,q('#sihPreview'),q('#sihImageStatus'),q('#sihModel'),q('#sihClass'),q('#sihConf'));};
   q('#sihDataBtn').onclick=async()=>{const file=q('#sihData').files?.[0];if(!file){q('#sihDataStatus').textContent='Choose a CSV or JSON file first.';return}const text=await file.text();let ok=false,count=0;try{if(file.name.toLowerCase().endsWith('.json')){const d=JSON.parse(text);count=Array.isArray(d)?d.length:(Array.isArray(d.data)?d.data.length:1);ok=true}else{const lines=text.split(/\r?\n/).filter(Boolean);const headers=(lines[0]||'').toLowerCase().split(',').map(x=>x.trim());const required=['timestamp','latitude','longitude'];ok=required.every(x=>headers.includes(x));count=Math.max(0,lines.length-1)}q('#sihDataStatus').textContent=ok?`✓ Validated ${count} record(s). Ready for API/training pipeline.`:'⚠ Missing required fields. Need timestamp, latitude and longitude.'}catch{q('#sihDataStatus').textContent='⚠ Invalid CSV/JSON format.'}};
 
-  // Main dashboard upload uses the same existing Render ML endpoint.
   function bindMainDashboardUpload(){
-    const input=q('#imageInput');
-    if(!input||input.__mainUploadBound)return;
-    input.__mainUploadBound=true;
+    const input=q('#imageInput');if(!input||input.__mainUploadBound)return;input.__mainUploadBound=true;
     input.addEventListener('change',async()=>{
-      const file=input.files?.[0];if(!file)return;
-      q('#fileName').textContent=file.name;
-      q('#uploadClass').textContent='Analysing…';
-      q('#uploadPattern').textContent='RUNNING';
-      q('#uploadWind').textContent='—';q('#uploadPressure').textContent='—';q('#uploadConfidence').textContent='—';q('#uploadRisk').textContent='—';
-      const result=await analyseFile(file,null,null,null,null,null);
-      if(!result){q('#uploadClass').textContent='AI ERROR';q('#uploadPattern').textContent='Backend unavailable';return}
+      const file=input.files?.[0];if(!file)return;q('#fileName').textContent=file.name;q('#uploadClass').textContent='Analysing…';q('#uploadPattern').textContent='RUNNING';q('#uploadWind').textContent='—';q('#uploadPressure').textContent='—';q('#uploadConfidence').textContent='—';q('#uploadRisk').textContent='—';
+      const result=await analyseFile(file,null,null,null,null,null);if(!result){q('#uploadClass').textContent='AI ERROR';q('#uploadPattern').textContent='Backend unavailable';return;}
       const detected=Boolean(result.stage1?.detected);
-      q('#uploadClass').textContent=result.classification||(detected?'CYCLONE DETECTED':'NO CYCLONE DETECTED');
-      q('#uploadPattern').textContent=detected?(result.classification||'Cyclonic pattern'):'No cyclone detected';
-      q('#uploadWind').textContent=result.stage3?.wind_change_kt!=null?`${Number(result.stage3.wind_change_kt).toFixed(2)} kt Δ`:'Not estimated';
-      q('#uploadPressure').textContent=result.stage3?.mslp_change_hpa!=null?`${Number(result.stage3.mslp_change_hpa).toFixed(2)} hPa Δ`:'Not estimated';
-      q('#uploadConfidence').textContent=result.confidence!=null?`${Number(result.confidence).toFixed(2)}%`:'—';
-      q('#uploadRisk').textContent=detected?`${Number(result.stage1?.probability||0).toFixed(2)}% detection`:'No cyclone';
-      q('#modelForecastStatus').textContent=result.model_status==='MODEL_OUTPUT'?'Real 3-stage Keras model output received':(result.model_status||'Backend response received');
-      q('#analysisClass').textContent=result.classification||'Waiting';
-      q('#snapshotPattern').textContent=result.classification||'—';
-      q('#snapshotConfidence').textContent=result.confidence!=null?`${result.confidence}%`:'—';
-      updateIdentification(result);
+      if(!detected){
+        q('#uploadClass').textContent='INVALID IMAGE';q('#uploadPattern').textContent='No cyclone detected';q('#uploadWind').textContent='BLOCKED';q('#uploadPressure').textContent='BLOCKED';q('#uploadConfidence').textContent='—';q('#uploadRisk').textContent='REJECTED';q('#modelForecastStatus').textContent='Analysis blocked — invalid image';q('#analysisClass').textContent='INVALID IMAGE';q('#snapshotPattern').textContent='No cyclone detected';q('#snapshotConfidence').textContent='—';updateIdentification(result);return;
+      }
+      q('#uploadClass').textContent=result.classification||'CYCLONE DETECTED';q('#uploadPattern').textContent=result.classification||'Cyclonic pattern';q('#uploadWind').textContent=result.stage3?.wind_change_kt!=null?`${Number(result.stage3.wind_change_kt).toFixed(2)} kt Δ`:'Not estimated';q('#uploadPressure').textContent=result.stage3?.mslp_change_hpa!=null?`${Number(result.stage3.mslp_change_hpa).toFixed(2)} hPa Δ`:'Not estimated';q('#uploadConfidence').textContent=result.confidence!=null?`${Number(result.confidence).toFixed(2)}%`:'—';q('#uploadRisk').textContent=`${Number(result.stage1?.probability||0).toFixed(2)}% detection`;q('#modelForecastStatus').textContent=result.model_status==='MODEL_OUTPUT'?'Real 3-stage Keras model output received':(result.model_status||'Backend response received');q('#analysisClass').textContent=result.classification||'Waiting';q('#snapshotPattern').textContent=result.classification||'—';q('#snapshotConfidence').textContent=result.confidence!=null?`${result.confidence}%`:'—';updateIdentification(result);
     });
   }
-  bindMainDashboardUpload();
-  new MutationObserver(()=>{bindMainDashboardUpload();ensureIdentificationCard()}).observe(document.body,{childList:true,subtree:true});
-  renderHistory();
-  window.SIHUpgrade={open:()=>drawer.classList.add('open'),search};
-  const proto=document.createElement('script');proto.defer=true;proto.src='prototype-upgrade.js';document.head.appendChild(proto);
+  bindMainDashboardUpload();new MutationObserver(()=>{bindMainDashboardUpload();ensureIdentificationCard()}).observe(document.body,{childList:true,subtree:true});renderHistory();window.SIHUpgrade={open:()=>drawer.classList.add('open'),search};const proto=document.createElement('script');proto.defer=true;proto.src='prototype-upgrade.js';document.head.appendChild(proto);
 })();
