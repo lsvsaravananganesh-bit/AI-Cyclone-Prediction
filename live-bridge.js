@@ -1,6 +1,8 @@
-/* Frontend bridge: routes live IMD calls through FastAPI when configured and exposes the existing Leaflet map to optional SIH layers. */
+/* Frontend bridge: connects the dashboard to the deployed FastAPI backend and exposes the existing Leaflet map to optional SIH layers. */
 (() => {
-  const api = (window.CYCLONE_API_BASE || '').replace(/\/$/, '');
+  const configured = (window.CYCLONE_API_BASE || '').trim();
+  const api = (configured || 'https://ai-cyclone-prediction-api.onrender.com').replace(/\/$/, '');
+  window.CYCLONE_API_BASE = api;
   const originalFetch = window.fetch.bind(window);
   if (api) {
     window.fetch = (input, init) => {
