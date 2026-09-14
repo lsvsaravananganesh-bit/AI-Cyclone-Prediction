@@ -1,4 +1,4 @@
-/* Frontend bridge + browser vision gate. Backend/Render is untouched. */
+/* Frontend bridge + strict browser vision gate. Backend/Render is untouched. */
 (() => {
   const configured=(window.CYCLONE_API_BASE||'').trim();
   const api=(configured||'https://ai-cyclone-prediction-api.onrender.com').replace(/\/$/,'');
@@ -18,22 +18,69 @@
     })();
     try{await visionPromise}catch(e){visionPromise=null;throw e}
   }
-  const badWords=['person','man','woman','boy','girl','face','portrait','selfie','people','groom','bride','suit','tie','jersey','uniform','helmet','mask','car','vehicle','bus','truck','motorcycle','bicycle','building','house','street','road','sign','poster','billboard','screen','television','book','menu','comic','cartoon','logo'];
+
+  const humanWords=['person','man','woman','boy','girl','face','portrait','selfie','people','groom','bride','suit','tie','jersey','uniform','helmet','mask'];
+  const objectWords=['car','vehicle','bus','truck','motorcycle','bicycle','building','house','street','road','sign','poster','billboard','screen','television','book','menu','comic','cartoon','logo'];
+  const weatherWords=['cloud','cloudy','storm','thunderstorm','rain','rainbow','sky','seashore','volcano','geyser','valley'];
+
+  function maxLabelScore(preds,words){
+    let best=null;
+    for(const p of preds){
+      const n=(p.className||'').toLowerCase();
+      if(words.some(w=>n.includes(w))&&(!best||p.probability>best.probability))best=p;
+    }
+    return best;
+  }
+
   async function browserVisionGate(file){
     if(!file)return {pass:false,reason:'No image selected.'};
     if(!file.type.startsWith('image/'))return {pass:false,reason:'Uploaded file is not an image.'};
-    await loadVision();
-    const img=new Image();const objectUrl=URL.createObjectURL(file);img.src=objectUrl;
-    await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('Image could not be decoded'))});
-    const preds=await mobileModel.classify(img,10);
-    const objects=await cocoModel.detect(img);
-    const person=objects.filter(x=>x.class==='person').sort((a,b)=>b.score-a.score)[0];
-    const bad=preds.find(x=>badWords.some(w=>x.className.toLowerCase().includes(w))&&x.probability>=0.18);
-    const objectBad=person&&person.score>=0.58;
-    URL.revokeObjectURL(objectUrl);
-    if(objectBad)return {pass:false,reason:`Human/person detected (${Math.round(person.score*100)}%). Upload satellite/weather imagery, not a human photo or poster.`,predictions:preds};
-    if(bad)return {pass:false,reason:`Non-meteorological content detected: ${bad.className} (${Math.round(bad.probability*100)}%). Upload an actual satellite/weather image.`,predictions:preds};
-    return {pass:true,predictions:preds};
+    try{await loadVision()}catch(e){
+      /* Strict mode: never send an unverified image to the cyclone model. */
+      return {pass:false,reason:'Browser visual verification could not be loaded. Please refresh the page and try again.'};
+    }
+
+    const img=new Image();
+    const objectUrl=URL.createObjectURL(file);
+    img.src=objectUrl;
+    try{
+      await new Promise((res,rej)=>{img.onload=res;img.onerror=()=>rej(new Error('Image could not be decoded'))});
+      const preds=await mobileModel.classify(img,10);
+      const objects=await cocoModel.detect(img);
+      const person=objects.filter(x=>x.class==='person').sort((a,b)=>b.score-a.score)[0];
+      const human=maxLabelScore(preds,humanWords);
+      const object=maxLabelScore(preds,objectWords);
+      const weather=maxLabelScore(preds,weatherWords);
+      const top=preds[0];
+
+      /* A human/poster must not reach the cyclone model. Use multiple independent signals. */
+      if(person&&person.score>=0.25){
+        return {pass:false,reason:`Human/person detected (${Math.round(person.score*100)}%). This image is rejected before cyclone AI analysis. Upload satellite/weather imagery.` ,predictions:preds};
+      }
+      if(human&&human.probability>=0.10){
+        return {pass:false,reason:`Human content detected (${human.className}, ${Math.round(human.probability*100)}%). Upload an actual satellite/weather image, not a human poster/photo.`,predictions:preds};
+      }
+      if(object&&object.probability>=0.12){
+        return {pass:false,reason:`Non-meteorological content detected (${object.className}, ${Math.round(object.probability*100)}%). The image was blocked before cyclone AI analysis.`,predictions:preds};
+      }
+
+      /* If the general vision model sees no weather cue and is strongly confident in
+         another everyday object/scene, treat it as an invalid source image. */
+      const weatherScore=weather?.probability||0;
+      if(top&&top.probability>=0.50&&weatherScore<0.08){
+        return {pass:false,reason:`The image does not appear to be meteorological imagery (vision confidence ${Math.round(top.probability*100)}% for ${top.className}). Upload a satellite/weather image.`,predictions:preds};
+      }
+
+      /* Very text-heavy portrait/poster layouts commonly expose a person or poster label;
+         this extra visual check rejects extreme poster-like aspect ratios when no weather cue exists. */
+      const w=img.naturalWidth,h=img.naturalHeight;
+      const extremePoster=w>0&&h>0&&(Math.max(w,h)/Math.min(w,h)>2.25);
+      if(extremePoster&&weatherScore<0.08&&top&&top.probability>=0.30){
+        return {pass:false,reason:'Poster/photo-like image rejected. Please upload the original satellite/weather frame.',predictions:preds};
+      }
+
+      return {pass:true,predictions:preds,weatherScore};
+    }finally{URL.revokeObjectURL(objectUrl)}
   }
 
   /* Intercept only the cyclone image endpoint. Other API calls are unchanged. */
@@ -48,9 +95,6 @@
       if(result.pass)return originalFetch(input,init);
       const payload={frontend_verification:{status:'REJECTED',reason:result.reason},model_status:'FRONTEND_REJECTED',stage1:{detected:false,probability:0},classification:null,confidence:null,message:result.reason};
       return new Response(JSON.stringify(payload),{status:200,headers:{'Content-Type':'application/json','X-Cyclone-Vision-Gate':'REJECTED'}});
-    }).catch(err=>{
-      console.warn('Browser vision gate unavailable; allowing backend request:',err);
-      return originalFetch(input,init);
     });
   };
 
