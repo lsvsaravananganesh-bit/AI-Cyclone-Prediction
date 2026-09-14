@@ -121,43 +121,38 @@ def _deltas(raw,stats):
     return vals
 
 @app.post("/api/ml/analyze-image")
-async def analyze_image(file:UploadFile=File(...), latitude:float|None=Form(None), longitude:float|None=Form(None), invert:bool=Form(False)):
+async def analyze_image(file:list[UploadFile]=File(...), latitude:float|None=Form(None), longitude:float|None=Form(None), invert:bool=Form(False)):
     allowed={"image/jpeg","image/png","image/webp","image/tiff"}
-    if file.content_type not in allowed: raise HTTPException(400,"Use JPG, PNG, WEBP or TIFF.")
-    raw=await file.read()
-    if len(raw)>15*1024*1024: raise HTTPException(413,"Image exceeds 15 MB.")
-    try: Image.open(io.BytesIO(raw)).verify()
-    except Exception as e: raise HTTPException(400,"Invalid image file.") from e
+    if not file: raise HTTPException(400,"Upload at least one satellite image.")
+    files=file[:3]; raws=[]
+    for item in files:
+        if item.content_type not in allowed: raise HTTPException(400,"Use JPG, PNG, WEBP or TIFF.")
+        raw=await item.read()
+        if len(raw)>15*1024*1024: raise HTTPException(413,"Image exceeds 15 MB.")
+        try: Image.open(io.BytesIO(raw)).verify()
+        except Exception as e: raise HTTPException(400,"Invalid image file.") from e
+        raws.append(raw)
     try:
         s1,s2,s3,weights,stats=_load_models()
         import numpy as np
-        frame=_preprocess_bytes(raw,invert)
-        latest=np.expand_dims(frame,0)
-        seq=np.expand_dims(np.stack([frame,frame,frame],axis=0),0)
-        detection=float(s1.predict(latest,verbose=0)[0][0]); detected=detection>0.5
-        result={"model_status":"MODEL_OUTPUT","model_version":"3-stage Keras ML project","stage1":{"detected":detected,"probability":round(detection*100,2)},"source":"AI MODEL OUTPUT","demo":False,"location":{"latitude":latitude,"longitude":longitude} if latitude is not None and longitude is not None else None}
-        if not detected:
-            result["stage2"]={"class_index":None,"classification":"NO CYCLONE DETECTED","probabilities":None}
-            result["stage3"]={"available":False,"reason":"Stage 1 detection gate was negative."}
-            result["classification"]="NO CYCLONE DETECTED"; result["confidence"]=round((1-detection)*100,2)
-            result["message"]="Stage 1 detection model did not identify a cyclone. No map detection marker was placed."
-            return result
-        raw_probs=s2.predict(seq,verbose=0)[0]; calibrated=raw_probs*weights; idx=int(np.argmax(calibrated))
-        cats=["Category 0 (Weak)","Category 1 (Moderate)","Category 2 (Strong)"]
-        forecast=s3.predict(seq,verbose=0)[0]; real=_deltas(forecast,stats)
-        result["stage2"]={"class_index":idx,"classification":cats[idx],"raw_probabilities":[round(float(x)*100,2) for x in raw_probs],"calibrated_probabilities":[round(float(x)*100,2) for x in calibrated]}
-        result["classification"]=cats[idx]; result["confidence"]=round(float(calibrated[idx])/max(float(calibrated.sum()),1e-9)*100,2)
-        result["stage3"]={"available":True,"input_mode":"repeated-single-frame","latitude_drift_deg":round(real[0],3),"longitude_drift_deg":round(real[1],3),"wind_change_kt":round(real[2],3),"mslp_change_hpa":round(real[3],3),"caution":"Stage 3 needs three genuine consecutive frames for temporal forecasting; single-image mode repeats the frame and is illustrative."}
-        result["message"]="Real trained 3-stage ML output. Stage 1/2 are model inference; Stage 3 is shown with the project's single-frame fallback caution."
-        if latitude is not None and longitude is not None:
-            result["stage3"]["next_position"]={"latitude":round(latitude+real[0],5),"longitude":round(longitude+real[1],5)}
+        frames=[_preprocess_bytes(raw,invert) for raw in raws]; latest=np.expand_dims(frames[-1],0)
+        if len(frames)==1: frames=frames*3; input_mode="repeated-single-frame"
         else:
-            result["message"]+=" Coordinates were not supplied, so the frontend must not invent a map position."
+            while len(frames)<3: frames.insert(0,frames[0])
+            input_mode="three-frame-sequence"
+        seq=np.expand_dims(np.stack(frames,axis=0),0)
+        detection=float(s1.predict(latest,verbose=0)[0][0]); detected=detection>0.5
+        result={"model_status":"MODEL_OUTPUT","model_version":"3-stage Keras ML project","frames_received":len(raws),"stage1":{"detected":detected,"probability":round(detection*100,2)},"source":"AI MODEL OUTPUT","demo":False,"location":{"latitude":latitude,"longitude":longitude} if latitude is not None and longitude is not None else None}
+        if not detected:
+            result["stage2"]={"class_index":None,"classification":"NO CYCLONE DETECTED","probabilities":None}; result["stage3"]={"available":False,"reason":"Stage 1 detection gate was negative."}; result["classification"]="NO CYCLONE DETECTED"; result["confidence"]=round((1-detection)*100,2); result["message"]="Stage 1 detection model did not identify a cyclone. No map detection marker was placed."; return result
+        raw_probs=s2.predict(seq,verbose=0)[0]; calibrated=raw_probs*weights; idx=int(np.argmax(calibrated)); cats=["Category 0 (Weak)","Category 1 (Moderate)","Category 2 (Strong)"]; forecast=s3.predict(seq,verbose=0)[0]; real=_deltas(forecast,stats)
+        result["stage2"]={"class_index":idx,"classification":cats[idx],"raw_probabilities":[round(float(x)*100,2) for x in raw_probs],"calibrated_probabilities":[round(float(x)*100,2) for x in calibrated]}; result["classification"]=cats[idx]; result["confidence"]=round(float(calibrated[idx])/max(float(calibrated.sum()),1e-9)*100,2)
+        result["stage3"]={"available":True,"input_mode":input_mode,"latitude_drift_deg":round(real[0],3),"longitude_drift_deg":round(real[1],3),"wind_change_kt":round(real[2],3),"mslp_change_hpa":round(real[3],3),"caution":"Use three genuine consecutive frames for meaningful temporal forecasting. A single frame is repeated only as the documented fallback."}; result["message"]="Real trained 3-stage ML output. Stage 1/2 are model inference; Stage 3 is the project's regression output."
+        if latitude is not None and longitude is not None: result["stage3"]["next_position"]={"latitude":round(latitude+real[0],5),"longitude":round(longitude+real[1],5)}
+        else: result["message"]+=" Coordinates were not supplied, so the frontend must not invent a map position."
         return result
-    except FileNotFoundError as e:
-        return {"model_status":"MODEL_NOT_READY","classification":None,"confidence":None,"demo":False,"message":str(e)}
-    except Exception as e:
-        return {"model_status":"MODEL_ERROR","classification":None,"confidence":None,"demo":False,"message":f"3-stage ML inference failed: {type(e).__name__}: {e}"}
+    except FileNotFoundError as e: return {"model_status":"MODEL_NOT_READY","classification":None,"confidence":None,"demo":False,"message":str(e)}
+    except Exception as e: return {"model_status":"MODEL_ERROR","classification":None,"confidence":None,"demo":False,"message":f"3-stage ML inference failed: {type(e).__name__}: {e}"}
 
 @app.post("/api/data/validate")
 async def validate_data(file:UploadFile=File(...)):
