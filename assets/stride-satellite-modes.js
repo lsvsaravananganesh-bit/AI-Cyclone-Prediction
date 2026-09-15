@@ -1,5 +1,6 @@
 (() => {
   const LIVE_MAP_URL = 'https://zoom.earth/storms/94a-2026/';
+  const STRIDE_MODES_VERSION = '2026-09-15-v2';
 
   function installSatelliteModes() {
     const analysis = document.getElementById('analysis');
@@ -10,6 +11,7 @@
 
     const switcher = document.createElement('div');
     switcher.className = 'stride-satellite-modes';
+    switcher.dataset.version = STRIDE_MODES_VERSION;
     switcher.innerHTML = `
       <div class="stride-mode-head">
         <div><span>STRIDE SATELLITE AI</span><h2>🛰️ Choose Analysis Mode</h2><p>Analyze an uploaded satellite image or monitor the live cyclone map.</p></div>
@@ -36,15 +38,14 @@
     buttons.forEach(button => {
       button.addEventListener('click', () => {
         const mode = button.dataset.mode;
-        buttons.forEach(b => b.classList.toggle('active', b === button));
+        buttons.forEach(b => {
+          b.classList.toggle('active', b === button);
+          b.setAttribute('aria-selected', b === button ? 'true' : 'false');
+        });
         const upload = mode === 'upload';
         uploadPanel.style.display = upload ? '' : 'none';
         livePanel.hidden = upload;
         switcher.dataset.activeMode = mode;
-        if (!upload) {
-          const iframe = livePanel.querySelector('iframe');
-          if (iframe && !iframe.src) iframe.src = LIVE_MAP_URL;
-        }
       });
     });
 
