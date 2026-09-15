@@ -1,0 +1,15 @@
+{
+  "name": "STRIDE — Cyclone Intelligence & Early Warning",
+  "short_name": "STRIDE AI",
+  "description": "Satellite-based Tropical Risk & Intelligence for cyclone identification, classification, prediction and early-warning decision support.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#020b16",
+  "theme_color": "#061323",
+  "categories": ["weather", "science", "utilities"],
+  "icons": [
+    {"src":"./assets/stride-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}
