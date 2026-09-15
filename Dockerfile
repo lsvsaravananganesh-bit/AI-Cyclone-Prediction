@@ -15,4 +15,4 @@ COPY backend /app/backend
 COPY ml /app/ml
 
 EXPOSE 8000
-CMD ["sh", "-c", "uvicorn backend.satellite_demo_api:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "uvicorn backend.production:app --host 0.0.0.0 --port ${PORT:-8000}"]
