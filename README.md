@@ -1,12 +1,27 @@
-# AI Cyclone Prediction & Intelligence System
+# STRIDE
 
-**Smart India Hackathon (SIH) research prototype** for AI-assisted tropical cyclone identification, classification, intensity estimation and track analysis using satellite and environmental data.
+**Satellite-based Tropical Risk & Intelligence for Disaster Early-warning**
+
+> **See the Storm. Predict the Risk. Protect the Future.**
+
+**STRIDE** is a Smart India Hackathon (SIH) research prototype for AI-assisted tropical cyclone identification, classification, intensity estimation and track analysis using satellite and environmental data.
+
+## What STRIDE does
+
+- 🛰️ Multi-source satellite imagery analysis
+- 🌪️ Tropical cyclone identification and pattern classification
+- 📈 Intensity estimation and prediction support
+- 🗺️ Track-analysis and visualization concepts
+- 🌊 Environmental and coastal-risk context
+- 🔎 Historical cyclone / analog comparison
+- 💡 Explainable analysis for decision support
+- 🛡️ Satellite-image validation to reduce non-satellite inputs
 
 ## ZIP integration status
 
-This repository has been repaired using the supplied **ai-cyclone-prediction-&-intelligence-system (1).zip** as the source of truth for the ML architecture, preprocessing pipeline, environment configuration, and project details. The original project concepts are being preserved rather than replaced by a simplified demo.
+This repository preserves the supplied **AI Cyclone Prediction & Intelligence System** source concepts rather than replacing them with a simplified demo.
 
-Integrated from the archive:
+Integrated project concepts include:
 - ResNet50 dual-head cyclone classifier/regressor architecture
 - 512×512 satellite preprocessing pipeline
 - IR-1 radiance normalization and channel alignment
@@ -20,11 +35,11 @@ Integrated from the archive:
 
 ## API key handling
 
-The archive contains an **environment-variable placeholder** for `GEMINI_API_KEY`; it does not contain a usable secret API key. Real API keys must not be committed to GitHub. Use `.env.local`/deployment secrets and the `.env.example` template. The application can read `GEMINI_API_KEY` at runtime without exposing it in client-side source.
+The project uses an environment-variable placeholder for `GEMINI_API_KEY`; it does not contain a usable secret API key. Real API keys must never be committed to GitHub. Use deployment secrets or a local environment file.
 
 ## ML status
 
-The supplied archive contains the **model architecture and inference adapter**, but no verified trained checkpoint/weights were present. Therefore the repository must not claim that a trained model is connected merely because the architecture exists. The inference adapter keeps the supplied demonstration baseline explicitly marked as demo data and provides the integration point for the team's actual checkpoint.
+The repository contains the ML architecture and inference integration point, but a verified trained checkpoint/weights package is required for genuine model predictions. Demonstration outputs must not be presented as trained-model results.
 
 ## Architecture
 
@@ -45,23 +60,15 @@ INSAT / other satellite imagery + environmental observations
                          ↓
         Historical analog / environmental context
                          ↓
-             Explainable dashboard
+                  STRIDE dashboard
 ```
 
 ## Important data disclaimer
 
-Records such as **VAAYU** supplied in the prototype are demonstration records unless connected to a verified official feed. They must not be represented as current official IMD/RSMC warnings. Satellite image URLs in the supplied archive should likewise be replaced with authenticated official products before operational claims are made.
+Prototype records and imagery must be connected to verified official sources before operational claims are made. STRIDE is intended as an AI-assisted decision-support layer and does **not** replace official meteorological warnings or advisories.
 
 **Emergency warning decisions must always use official meteorological advisories.**
 
-## Local development
-
-Frontend prototype: install Node.js 20+ dependencies and run the Vite/React application from the supplied source tree.
-
-Python ML service: create a virtual environment, install `backend/requirements.txt`, then expose the FastAPI service used by the frontend.
-
-Keep secrets outside Git and configure `GEMINI_API_KEY`, database credentials and model-weight paths through the environment.
-
 ## SIH positioning
 
-The differentiator is not replacing IMD. It is an AI-assisted decision-support layer that unifies multi-source satellite analysis, environmental validation, historical analog comparison, intensity/track modelling and explainable presentation in one workflow.
+STRIDE does not aim to replace existing meteorological warning agencies. Its role is to provide an AI-assisted decision-support workflow that brings multi-source satellite analysis, environmental validation, historical analog comparison, intensity/track modelling and explainable presentation together in one platform.
