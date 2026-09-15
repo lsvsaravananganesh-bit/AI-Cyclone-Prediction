@@ -14,7 +14,7 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps
 
-app = FastAPI(title="AI Cyclone Satellite AI", version="3.0.0")
+app = FastAPI(title="AI Cyclone Satellite AI", version="3.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 MODEL_DIR = os.getenv("ML_MODEL_DIR", os.path.join(os.path.dirname(__file__), "models"))
@@ -132,6 +132,41 @@ def _denormalize(values, stats):
     return [float(values[i]) * float(stats[key][1]) + float(stats[key][0]) for i, key in enumerate(("lat", "lon", "Vmax", "MSLP"))]
 
 
+def _stage_summary(result: dict) -> dict:
+    """Create stable, dashboard-friendly names without removing legacy fields."""
+    stage1 = result.get("stage1") or {}
+    stage2 = result.get("stage2") or {}
+    stage3 = result.get("stage3") or {}
+    return {
+        "identification": {
+            "status": "CYCLONE_DETECTED" if result.get("cyclone_detected") is True else "NO_CYCLONE_DETECTED",
+            "cyclone_detected": result.get("cyclone_detected"),
+            "probability_percent": stage1.get("probability"),
+        },
+        "classification": {
+            "status": stage2.get("status", "COMPLETE" if result.get("cyclone_detected") else "SKIPPED"),
+            "label": stage2.get("classification") or result.get("classification"),
+            "confidence_percent": result.get("confidence") if result.get("cyclone_detected") else None,
+            "class_index": stage2.get("class_index"),
+            "probabilities_percent": stage2.get("calibrated_probabilities"),
+        },
+        "prediction": {
+            "status": stage3.get("status", "AVAILABLE" if stage3.get("available") else "SKIPPED"),
+            "input_mode": stage3.get("input_mode"),
+            "next_position": stage3.get("next_position"),
+            "latitude_drift_deg": stage3.get("latitude_drift_deg"),
+            "longitude_drift_deg": stage3.get("longitude_drift_deg"),
+            "wind_change_kt": stage3.get("wind_change_kt"),
+            "mslp_change_hpa": stage3.get("mslp_change_hpa"),
+            "movement_speed_kmh": result.get("movement_speed_kmh"),
+            "maximum_wind_kmh": result.get("maximum_wind_kmh"),
+            "central_pressure_hpa": result.get("central_pressure_hpa"),
+            "risk_level": result.get("risk_level"),
+            "caution": stage3.get("caution"),
+        },
+    }
+
+
 @app.get("/api/health")
 def health():
     artifacts = {p: os.path.exists(os.path.join(MODEL_DIR, p)) for p in MODEL_FILES}
@@ -141,7 +176,7 @@ def health():
 @app.get("/api/model/status")
 def model_status():
     artifacts = {p: os.path.exists(os.path.join(MODEL_DIR, p)) for p in MODEL_FILES}
-    return {"state": "READY" if all(artifacts.values()) else "MODEL_NOT_READY", "modelVersion": "3-stage Keras ML project", "isDemoMode": False, "trainedWeightsAvailable": all(artifacts.values()), "satelliteVerification": "CONSERVATIVE_CONTENT_GATE_V1", "message": "Identification, classification and prediction models are loaded from backend/models."}
+    return {"state": "READY" if all(artifacts.values()) else "MODEL_NOT_READY", "modelVersion": "3-stage Keras ML project", "isDemoMode": False, "trainedWeightsAvailable": all(artifacts.values()), "satelliteVerification": "CONSERVATIVE_CONTENT_GATE_V1", "stages": ["IDENTIFICATION", "CLASSIFICATION", "PREDICTION"], "message": "Identification, classification and prediction models are loaded from backend/models."}
 
 
 @app.post("/api/ml/analyze-image")
@@ -157,7 +192,9 @@ async def analyze_image(file: list[UploadFile] = File(...), latitude: float | No
 
     gate = _satellite_gate(raws[-1], items[-1].filename or "")
     if not gate["verified"]:
-        return {"model_status": "INPUT_REJECTED", "reason": "NON_SATELLITE_IMAGE", "cyclone_detected": False, "classification": "NON-SATELLITE IMAGE", "confidence": None, "demo": False, "satellite_verified": False, "message": gate["reason"], "input_validation": {"is_satellite": False, "satellite_image": False, "confidence": gate["confidence"], "reason": gate["reason"], "signals": gate.get("signals", {})}, "stage1": {"status": "SKIPPED"}, "stage2": {"status": "SKIPPED"}, "stage3": {"available": False, "status": "SKIPPED"}, "pipeline": ["VALIDATE", "SATELLITE INPUT GATE", "REJECT"]}
+        rejected = {"model_status": "INPUT_REJECTED", "reason": "NON_SATELLITE_IMAGE", "cyclone_detected": False, "classification": "NON-SATELLITE IMAGE", "confidence": None, "demo": False, "satellite_verified": False, "message": gate["reason"], "input_validation": {"is_satellite": False, "satellite_image": False, "confidence": gate["confidence"], "reason": gate["reason"], "signals": gate.get("signals", {})}, "stage1": {"status": "SKIPPED"}, "stage2": {"status": "SKIPPED"}, "stage3": {"available": False, "status": "SKIPPED"}, "pipeline": ["VALIDATE", "SATELLITE INPUT GATE", "REJECT"]}
+        rejected["three_stage"] = _stage_summary(rejected)
+        return rejected
 
     try:
         s1, s2, s3, weights, stats = _load_models()
@@ -171,9 +208,10 @@ async def analyze_image(file: list[UploadFile] = File(...), latitude: float | No
         seq = np.expand_dims(np.stack(frames, axis=0), 0)
 
         detection = float(s1.predict(latest, verbose=0)[0][0]); detected = detection > 0.5
-        result = {"model_status": "MODEL_OUTPUT", "model_version": "3-stage Keras ML project", "frames_received": len(raws), "satellite_verified": True, "source": "AI MODEL OUTPUT", "demo": False, "trained_weights_available": True, "analysis_time": datetime.now(timezone.utc).isoformat(), "observation_time": None, "input_validation": {"is_satellite": True, "satellite_image": True, "confidence": gate["confidence"], "method": "CONSERVATIVE_CONTENT_GATE_V1", "signals": gate.get("signals", {})}, "stage1": {"detected": detected, "probability": round(detection * 100, 2)}}
+        result = {"model_status": "MODEL_OUTPUT", "model_version": "3-stage Keras ML project", "frames_received": len(raws), "satellite_verified": True, "source": "AI MODEL OUTPUT", "demo": False, "trained_weights_available": True, "analysis_time": datetime.now(timezone.utc).isoformat(), "observation_time": None, "input_validation": {"is_satellite": True, "satellite_image": True, "confidence": gate["confidence"], "method": "CONSERVATIVE_CONTENT_GATE_V1", "signals": gate.get("signals", {})}, "stage1": {"status": "COMPLETE", "detected": detected, "probability": round(detection * 100, 2)}}
         if not detected:
             result.update({"cyclone_detected": False, "classification": "NO CYCLONE DETECTED", "confidence": round((1 - detection) * 100, 2), "stage2": {"status": "SKIPPED"}, "stage3": {"available": False, "status": "SKIPPED", "reason": "Stage 1 detection model was negative."}, "risk_level": "LOW", "message": "Stage 1 ML model did not identify a cyclone. No cyclone result is reported."})
+            result["three_stage"] = _stage_summary(result)
             return result
 
         raw_probs = s2.predict(seq, verbose=0)[0]
@@ -184,11 +222,12 @@ async def analyze_image(file: list[UploadFile] = File(...), latitude: float | No
         real = _denormalize(forecast, stats)
         class_conf = float(calibrated[idx]) / max(float(calibrated.sum()), 1e-9) * 100
         risk = "HIGH" if idx >= 2 or class_conf >= 85 else ("MEDIUM" if idx == 1 else "LOW")
-        result.update({"cyclone_detected": True, "classification": cats[idx], "confidence": round(class_conf, 2), "stage2": {"class_index": idx, "classification": cats[idx], "raw_probabilities": [round(float(x) * 100, 2) for x in raw_probs], "calibrated_probabilities": [round(float(x) * 100, 2) for x in calibrated]}, "stage3": {"available": True, "input_mode": input_mode, "latitude_drift_deg": round(real[0], 3), "longitude_drift_deg": round(real[1], 3), "wind_change_kt": round(real[2], 3), "mslp_change_hpa": round(real[3], 3), "caution": "Use three genuine consecutive timestamped frames for meaningful temporal forecasting."}, "risk_level": risk, "movement_speed_kmh": None, "maximum_wind_kmh": None, "central_pressure_hpa": None, "message": "Real trained 3-stage ML output. Wind and pressure cards are withheld because this model predicts changes, not calibrated absolute observations."})
+        result.update({"cyclone_detected": True, "classification": cats[idx], "confidence": round(class_conf, 2), "stage2": {"status": "COMPLETE", "class_index": idx, "classification": cats[idx], "raw_probabilities": [round(float(x) * 100, 2) for x in raw_probs], "calibrated_probabilities": [round(float(x) * 100, 2) for x in calibrated]}, "stage3": {"available": True, "status": "AVAILABLE", "input_mode": input_mode, "latitude_drift_deg": round(real[0], 3), "longitude_drift_deg": round(real[1], 3), "wind_change_kt": round(real[2], 3), "mslp_change_hpa": round(real[3], 3), "caution": "Use three genuine consecutive timestamped frames for meaningful temporal forecasting."}, "risk_level": risk, "movement_speed_kmh": None, "maximum_wind_kmh": None, "central_pressure_hpa": None, "message": "Real trained 3-stage ML output. Wind and pressure cards are withheld because this model predicts changes, not calibrated absolute observations."})
         if latitude is not None and longitude is not None:
             result["stage3"]["next_position"] = {"latitude": round(latitude + real[0], 5), "longitude": round(longitude + real[1], 5)}
         else:
             result["message"] += " Supply latitude and longitude to project the next position."
+        result["three_stage"] = _stage_summary(result)
         return result
     except FileNotFoundError as exc:
         return {"model_status": "MODEL_NOT_READY", "demo": False, "message": str(exc), "pipeline": ["VALIDATE", "SATELLITE INPUT GATE", "ML ARTIFACT CHECK"]}
