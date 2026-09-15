@@ -1,7 +1,8 @@
 """FastAPI service for AI Cyclone Prediction.
 
-Integrates the user's TensorFlow/Keras 3-stage cyclone ML project with the
-existing SIH frontend. Official IMD observations are never replaced by ML.
+Adds an input-quality gate so ordinary photographs are rejected before cyclone
+ML inference. A cyclone classifier should never turn a portrait into a cyclone
+prediction simply because the upload is an image.
 """
 import io, os, csv, json, urllib.request, urllib.error, pickle
 from datetime import datetime, timezone
@@ -9,7 +10,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image, ImageOps
 
-app=FastAPI(title="AI Cyclone Prediction API", version="2.0.0")
+app=FastAPI(title="AI Cyclone Prediction API", version="2.1.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 REQUIRED_COLUMNS={"timestamp","latitude","longitude"}
 IMD_TRACK_URL="https://api.imd.gov.in/api/v1/cyclone_track"
@@ -22,7 +23,7 @@ def health():
             "three_stage_ml": all(os.path.exists(os.path.join(MODEL_DIR,p)) for p in ["identification_model.keras","classification_model.keras","prediction_model.keras"])}
 
 def _imd_get():
-    headers={"Accept":"application/json","User-Agent":"AI-Cyclone-Prediction/2.0"}
+    headers={"Accept":"application/json","User-Agent":"AI-Cyclone-Prediction/2.1"}
     key=os.getenv("IMD_API_KEY")
     if key:
         headers["Authorization"]=f"Bearer {key}"; headers["x-api-key"]=key
@@ -84,6 +85,41 @@ def cyclone_track(cyclone_id:int):
     with engine.connect() as c: rows=c.execute(sql,{"id":cyclone_id}).mappings().all()
     return {"source":"DATABASE","status":"OK","points":[dict(r) for r in rows]}
 
+# -------------------- INPUT QUALITY GATE --------------------
+def _obvious_non_satellite(raw: bytes) -> dict:
+    """Reject obvious human photographs before invoking the cyclone model.
+
+    This is a conservative guard, not a replacement for a properly trained
+    satellite-vs-non-satellite classifier. It prevents the exact failure shown
+    in testing: a portrait being interpreted as a cyclone.
+    """
+    try:
+        import cv2, numpy as np
+        arr=np.frombuffer(raw,dtype=np.uint8)
+        bgr=cv2.imdecode(arr,cv2.IMREAD_COLOR)
+        if bgr is None: return {"reject":False,"reason":None}
+        gray=cv2.cvtColor(bgr,cv2.COLOR_BGR2GRAY)
+        h,w=gray.shape[:2]
+        image_area=max(w*h,1)
+
+        face_cascade=cv2.CascadeClassifier(os.path.join(cv2.data.haarcascades,"haarcascade_frontalface_default.xml"))
+        if not face_cascade.empty():
+            faces=face_cascade.detectMultiScale(gray,scaleFactor=1.12,minNeighbors=5,minSize=(48,48))
+            face_area=sum(int(fw*fh) for _,_,fw,fh in faces)
+            if len(faces)>=1 and face_area/image_area >= 0.015:
+                return {"reject":True,"reason":"A human face was detected. Please upload genuine satellite imagery (IR/VIS/WV), not a personal photograph."}
+
+        # Built-in person detector catches many full-body portraits.
+        hog=cv2.HOGDescriptor(); hog.setSVMDetector(cv2.HOGDescriptor_getDefaultPeopleDetector())
+        scale=min(1.0,900.0/max(w,1)); test=bgr if scale==1 else cv2.resize(bgr,(int(w*scale),int(h*scale)))
+        rects,_=hog.detectMultiScale(test,winStride=(8,8),padding=(8,8),scale=1.05)
+        if len(rects)>0:
+            return {"reject":True,"reason":"A person was detected. Please upload genuine satellite imagery (IR/VIS/WV), not a personal photograph."}
+    except Exception:
+        # If the optional guard fails, do not block a legitimate satellite image.
+        pass
+    return {"reject":False,"reason":None}
+
 # -------------------- REAL 3-STAGE KERAS ML --------------------
 _CACHED=None
 
@@ -132,6 +168,14 @@ async def analyze_image(file:list[UploadFile]=File(...), latitude:float|None=For
         try: Image.open(io.BytesIO(raw)).verify()
         except Exception as e: raise HTTPException(400,"Invalid image file.") from e
         raws.append(raw)
+
+    gate=_obvious_non_satellite(raws[-1])
+    if gate["reject"]:
+        return {"model_status":"INPUT_REJECTED","cyclone_detected":False,"classification":"NON-SATELLITE IMAGE","confidence":None,"demo":False,
+                "message":gate["reason"],"input_validation":{"satellite_image":False,"reason":gate["reason"]},
+                "stage1":{"status":"SKIPPED","reason":"Input quality gate rejected the image before ML inference."},
+                "stage2":{"status":"SKIPPED"},"stage3":{"available":False,"status":"SKIPPED"}}
+
     try:
         s1,s2,s3,weights,stats=_load_models()
         import numpy as np
