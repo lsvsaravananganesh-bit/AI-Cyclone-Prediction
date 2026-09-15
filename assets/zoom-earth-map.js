@@ -5,7 +5,6 @@
     const tracker = document.querySelector('#tracker');
     if (!tracker || tracker.dataset.zoomEarthInstalled === '1') return;
 
-    // Preserve the existing tracker page structure, but replace its map area.
     const candidates = [...tracker.querySelectorAll('iframe, [id*="map"], [class*="map"], canvas')];
     let host = candidates.find(el => el.id && /map/i.test(el.id)) || candidates.find(el => /map/i.test(el.className || ''));
 
@@ -31,9 +30,6 @@
     tracker.dataset.zoomEarthInstalled = '1';
   }
 
-  // The UI should not block an uploaded image merely because the API did not
-  // return a separate satellite-verification flag. Supported images are sent
-  // directly to the trained identification/classification/prediction models.
   function removeClientVerificationGate() {
     const heading = document.querySelector('#analysis .heading p');
     if (heading) heading.textContent = 'Upload an image and run the AI model. The three-stage pipeline will analyse the supplied image and report the model output.';
@@ -52,8 +48,6 @@
 
     const run = document.getElementById('run');
     if (run && !run.dataset.openImageAnalysis) {
-      // The existing handler performs the API call. We only remove the
-      // client-side response gate by normalising successful API responses.
       const nativeFetch = window.fetch.bind(window);
       window.fetch = async (...args) => {
         const response = await nativeFetch(...args);
@@ -78,9 +72,30 @@
     }
   }
 
+  function installMobileLauncherFix() {
+    if (document.getElementById('stride-mobile-style')) return;
+    const style = document.createElement('style');
+    style.id = 'stride-mobile-style';
+    style.textContent = `
+      #launcher{position:fixed!important;z-index:2147483647!important;display:block!important;visibility:visible!important;opacity:1!important;pointer-events:auto!important;right:max(10px,env(safe-area-inset-right))!important;top:max(10px,env(safe-area-inset-top))!important}
+      #prediction{z-index:1!important}
+      #satellite{z-index:2147483646!important}
+      @media(max-width:700px){
+        #launcher{padding:10px 13px!important;min-height:44px!important;font-size:13px!important;white-space:nowrap!important;max-width:calc(100vw - 20px)!important}
+        #satellite .topbar{height:auto!important;min-height:64px!important;padding:10px!important}
+        #satellite .brand h1{font-size:16px!important}
+        #satellite .brand small{font-size:10px!important}
+        #satellite .logo{width:36px!important;height:36px!important;font-size:18px!important}
+        #satellite .back{min-height:42px!important;padding:9px 11px!important}
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
   function install() {
     installZoomEarthMap();
     removeClientVerificationGate();
+    installMobileLauncherFix();
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', install);
