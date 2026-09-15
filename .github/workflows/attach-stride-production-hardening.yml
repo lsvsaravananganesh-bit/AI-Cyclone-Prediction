@@ -1,0 +1,40 @@
+name: Attach STRIDE production hardening
+on:
+  push:
+    branches: [main, sih-production-hardening-2026]
+    paths:
+      - 'assets/stride-production-hardening.js'
+      - 'assets/stride-satellite-sources.js'
+      - '.github/workflows/attach-stride-production-hardening.yml'
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Attach production hardening scripts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('index.html')
+          s = p.read_text(encoding='utf-8')
+          tags = [
+              '<script src="./assets/stride-production-hardening.js"></script>',
+              '<script src="./assets/stride-satellite-sources.js"></script>'
+          ]
+          for tag in tags:
+              if tag not in s:
+                  if '</body>' in s:
+                      s = s.replace('</body>', tag + '\n</body>', 1)
+                  else:
+                      s += '\n' + tag
+          p.write_text(s, encoding='utf-8')
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'Attach STRIDE production hardening UI'
+          git push
