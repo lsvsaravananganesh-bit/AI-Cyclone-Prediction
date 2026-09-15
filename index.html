@@ -50,4 +50,5 @@ run.onclick=async()=>{if(!selected)return;run.disabled=true;step(0,'Running','co
 document.getElementById('archiveBtn').onclick=()=>{document.getElementById('archiveMsg').textContent='Search requested: '+(document.getElementById('archiveSearch').value||'all records')+'. Connect the verified historical cyclone dataset to return live archive records.'};
 if(location.hash&&location.hash!=='#analysis'&&document.getElementById(location.hash.slice(1)))openSatellite();else if(location.hash==='#analysis')openSatellite();
 </script><script src="./assets/three-stage-ui.js"></script>
-<script src="./assets/zoom-earth-map.js"></script></body></html>
+<script src="./assets/zoom-earth-map.js"></script><script src="./assets/stride-satellite-modes.js"></script>
+</body></html>
