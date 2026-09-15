@@ -1,0 +1,30 @@
+name: Attach STRIDE Satellite Modes
+on:
+  push:
+    paths:
+      - 'assets/stride-satellite-modes.js'
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Attach mode selector
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          tag='<script src="./assets/stride-satellite-modes.js"></script>'
+          if tag not in s:
+              s=s.replace('</body>', tag+'\n</body>', 1) if '</body>' in s else s+'\n'+tag
+              p.write_text(s,encoding='utf-8')
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'Attach STRIDE satellite analysis modes'
+          git push
